@@ -1,0 +1,65 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.kotlin
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
+
+# Docker Data (Çok Kritik: Veritabanı dosyaları repoya girmemeli)
+postgres_data/
+mysql_data/
+docker/data/
+
+# Environment Files (Güvenlik: Şifrelerin olduğu dosyalar)
+.env
+.env.local
+*.env
+
+# IntelliJ Specific (Dinamik dosyalar çakışma yaratır)
+.idea/workspace.xml
+.idea/shelf/
+.idea/httpRequests/
+.idea/dataSources.xml
+.idea/dataSources.local.xml
+
+# Log Files
+*.log
+logs/
+
+# Frontend (Vite/React için hazırlık)
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
