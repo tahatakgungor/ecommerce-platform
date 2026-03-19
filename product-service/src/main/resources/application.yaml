@@ -6,8 +6,8 @@ spring:
     name: product-service
   datasource:
     url: jdbc:postgresql://localhost:5432/ecommerce_product
-    username: user
-    password: password
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
@@ -18,3 +18,14 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     properties:
       spring.json.add.type.headers: false
+    jackson:
+      serialization:
+        # Tarihleri "2026, 3, 19..." gibi bir sayı dizisi yerine düzgün bir metin olarak yazması için
+        write-dates-as-timestamps: false
+
+logging:
+  level:
+    org.apache.kafka: WARN
+    org.springframework.kafka: WARN
+    # Sadece kendi yazdığın logları görmek için:
+    com.ecommerce.product: INFO

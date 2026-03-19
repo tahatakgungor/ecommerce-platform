@@ -1,5 +1,6 @@
 package com.ecommerce.product.application;
 
+import com.ecommerce.product.application.event.ProductCreatedEvent;
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.domain.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -22,9 +24,16 @@ public class ProductService {
     public Product save(Product product) {
         Product savedProduct = productRepository.save(product);
 
-        // Kafka'ya mesaj gönderiyoruz
-        log.info("Ürün kaydedildi, Kafka'ya event gönderiliyor: {}", savedProduct.getId());
-        kafkaTemplate.send("product-created-events", savedProduct.getId().toString(), savedProduct);
+        // Profesyonel Event Nesnesi Oluşturma
+        ProductCreatedEvent event = ProductCreatedEvent.builder()
+                .productId(savedProduct.getId())
+                .name(savedProduct.getName())
+                .price(savedProduct.getPrice())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        log.info("Kafka'ya Event fırlatılıyor: {}", event.getProductId());
+        kafkaTemplate.send("product-created-events", event.getProductId().toString(), event);
 
         return savedProduct;
     }

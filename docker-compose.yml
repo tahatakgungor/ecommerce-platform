@@ -4,11 +4,11 @@ services:
     container_name: ecommerce-db
     platform: linux/arm64
     environment:
-      POSTGRES_USER: tahatakgungor
-      POSTGRES_PASSWORD: 183792tT!
-      POSTGRES_DB: ecommerce_product
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -35,6 +35,20 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # YENİ: Kafka'yı görsel olarak izlemek için dashboard
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    platform: linux/arm64
+    ports:
+      - "${KAFKA_UI_PORT}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092 # İç ağ iletişimi için (Opsiyonel: localhost:9092 de çalışır)
+      KAFKA_CLUSTERS_0_METRICS_PORT: 9997
+    depends_on:
+      - kafka
 
 volumes:
   postgres_data:
