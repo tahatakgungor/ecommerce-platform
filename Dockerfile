@@ -1,25 +1,24 @@
-# 1. Aşama: Maven ile Projeyi Derle (Build Stage)
+# 1. Aşama: Build Stage
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# Önce üstteki ve alttaki pom dosyalarını kopyala (Cache için iyidir)
-COPY pom.xml .
-COPY product-service/pom.xml product-service/
-
-# Bağımlılıkları indir (Bu aşama bir kez yapılır, sonra hızlanır)
-RUN mvn dependency:go-offline -pl product-service -am
-
-# Tüm kodu kopyala ve derle
+# Tüm projeyi kopyala (Multi-module olduğu için root'taki pom.xml de lazım)
 COPY . .
+
+# Product-service modülünü derle ve testleri atla
+# -pl ile sadece ilgili modülü, -am ile bağımlı olduğu üst modülleri dahil ediyoruz
 RUN mvn clean package -DskipTests -pl product-service -am
 
-# 2. Aşama: Sadece Çalıştırılabilir Dosyayı Al (Run Stage)
+# 2. Aşama: Run Stage
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
-# Derleme aşamasında oluşan jar'ı buraya kopyala
-COPY --from=build /app/product-service/target/app.jar app.jar
+# Maven'ın oluşturduğu JAR dosyasını ismine bakmaksızın yakalayıp app.jar olarak kopyala
+# Joker karakter (*) kullanımı burada hayat kurtarır
+COPY --from=build /app/product-service/target/*.jar app.jar
+
+# Uygulama portu (Railway'de genelde 8080 beklenir ama 8081 kullanıyorsan kalsın)
+EXPOSE 8081
 
 # Uygulamayı başlat
-EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
