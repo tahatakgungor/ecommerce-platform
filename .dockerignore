@@ -1,0 +1,59 @@
+# Maven build artifacts
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+HELP.md
+*.md
+docs/
+
+# Test resources (if not needed in runtime)
+src/test/
+
+# Logs and temporary files
+*.log
+logs/
+temp/
+tmp/
+
+# Environment and configuration files
+.env
+.env.local
+.env.*.local
+
+# Docker files (not needed inside container)
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose*.yml
+
+# OS files
+.DS_Store
+Thumbs.db
