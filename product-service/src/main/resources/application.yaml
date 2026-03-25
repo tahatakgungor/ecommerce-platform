@@ -5,9 +5,9 @@ spring:
   application:
     name: product-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/ecommerce_product
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/${DB_NAME:ecommerce}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:password}
   jpa:
     hibernate:
       ddl-auto: update
