@@ -33,7 +33,7 @@ public class ProductService {
                 .build();
 
         log.info("Kafka'ya Event fırlatılıyor: {}", event.getProductId());
-        kafkaTemplate.send("product-created-events", event.getProductId().toString(), event);
+        //kafkaTemplate.send("product-created-events", event.getProductId().toString(), event);
 
         return savedProduct;
     }
