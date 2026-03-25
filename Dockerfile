@@ -13,12 +13,10 @@ RUN mvn clean package -DskipTests -pl product-service -am
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
 
-# Maven'ın oluşturduğu JAR dosyasını ismine bakmaksızın yakalayıp app.jar olarak kopyala
-# Joker karakter (*) kullanımı burada hayat kurtarır
-COPY --from=build /app/product-service/target/*.jar app.jar
+# Dosyayı build aşamasından alıp direkt /app içine kopyalıyoruz
+COPY --from=build /app/product-service/target/*.jar /app/app.jar
 
-# Uygulama portu (Railway'de genelde 8080 beklenir ama 8081 kullanıyorsan kalsın)
 EXPOSE 8081
 
-# Uygulamayı başlat
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Dosyayı tam yoluyla (absolute path) çalıştırıyoruz
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
