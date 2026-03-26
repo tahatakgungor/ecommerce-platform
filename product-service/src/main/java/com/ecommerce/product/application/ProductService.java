@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -36,6 +37,33 @@ public class ProductService {
         //kafkaTemplate.send("product-created-events", event.getProductId().toString(), event);
 
         return savedProduct;
+    }
+
+    // Long yerine UUID kullanıyoruz
+    public Product findById(UUID id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Ürün bulunamadı! ID: " + id));
+    }
+
+    @Transactional
+    public Product update(UUID id, Product productDetails) {
+        Product existingProduct = findById(id);
+
+        existingProduct.setName(productDetails.getName());
+        existingProduct.setDescription(productDetails.getDescription());
+        existingProduct.setPrice(productDetails.getPrice());
+        // setStock yerine setStockQuantity kullanıyoruz
+        existingProduct.setStockQuantity(productDetails.getStockQuantity());
+
+        log.info("Ürün güncellendi: {}", id);
+        return productRepository.save(existingProduct);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        Product product = findById(id);
+        productRepository.delete(product);
+        log.info("Ürün silindi: {}", id);
     }
 
     public List<Product> findAll() {
