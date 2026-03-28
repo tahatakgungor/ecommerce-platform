@@ -11,7 +11,7 @@ import java.util.UUID;
 @Slf4j
 @RestController
 @RequestMapping("/api/cloudinary")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "https://ecommerce-frontend-xryc.vercel.app"})
 public class CloudinaryController {
 
     @PostMapping("/add-img")
