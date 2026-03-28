@@ -6,13 +6,29 @@ import lombok.Data;
 
 import java.util.UUID;
 
+@Data
 @Entity
 @Table(name = "brands")
-@Data
 public class Brand {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @JsonProperty("_id")
     private UUID id;
+
+    @Column(nullable = false, unique = true)
     private String name;
+
+    private String email;
+    private String website;
+    private String location;
+    private String description;
+    private String logo;
+
+    // Frontend uyumluluğu için
+    @JsonProperty("_id")
+    public String getHarriId() {
+        return id != null ? id.toString() : null;
+    }
+
+    // Varsayılan durum
+    private String status = "Active";
 }

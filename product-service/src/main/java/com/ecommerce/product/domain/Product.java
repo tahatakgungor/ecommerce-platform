@@ -25,18 +25,14 @@ public class Product {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    // Harri Listeleme (GET /all) sayfasında bu alanı bekliyor
     @JsonProperty("price")
-    @Column(name = "price")
-    private Double price;
+    private Double price = 0.0;
 
-    // Harri Grid/Detay sayfasında (toFixed(2) hatası veren yer) bunu bekliyor
     @JsonProperty("originalPrice")
-    @Column(name = "original_price")
-    private Double originalPrice;
+    private Double originalPrice = 0.0;
 
     @JsonProperty("quantity")
-    private Integer stockQuantity;
+    private Integer stockQuantity = 0;
 
     private String sku;
     private String image;
@@ -55,10 +51,12 @@ public class Product {
     private String brandName;
 
     @ElementCollection
+    @CollectionTable(name = "product_tags", joinColumns = @JoinColumn(name = "product_id"))
     @JsonProperty("tags")
     private List<String> tags = new ArrayList<>();
 
     @ElementCollection
+    @CollectionTable(name = "product_colors", joinColumns = @JoinColumn(name = "product_id"))
     @JsonProperty("colors")
     private List<String> colors = new ArrayList<>();
 }

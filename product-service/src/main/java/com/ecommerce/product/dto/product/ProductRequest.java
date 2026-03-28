@@ -16,9 +16,14 @@ public class ProductRequest {
     private Integer stockQuantity;
 
     private String sku;
-    private Object image; // Obje veya String gelebilir
-    private String parent;
-    private String children;
+
+    // Bunlar Frontend'den Obje olarak geliyor olabilir, o yüzden Object yapıyoruz
+    private Object image;
+    private Object parent;
+    private Object children;
+    private Object category;
+    private Object brand;
+
     private List<String> tags;
     private List<String> colors;
 }

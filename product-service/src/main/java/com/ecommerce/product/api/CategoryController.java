@@ -1,11 +1,10 @@
 package com.ecommerce.product.api;
 
+import com.ecommerce.product.application.CategoryService;
 import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,23 +14,32 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CategoryController {
 
-    // private final CategoryService categoryService; // İleride aktif edilecek
+    private final CategoryService categoryService;
 
     @GetMapping("/all")
     public ApiResponse<List<Category>> getAllCategories() {
-        // Şimdilik mock veri, ama ApiResponse formatı kesinleştirildi
-        List<Category> categories = List.of(
-                createMockCategory("Electronics", List.of("Mobile", "Laptop")),
-                createMockCategory("Fashion", List.of("Shoes", "Clothing"))
-        );
-        return new ApiResponse<>(true, categories, (long) categories.size());
+        List<Category> categories = categoryService.getAllCategories();
+        return ApiResponse.ok(categories, (long) categories.size());
     }
 
-    private Category createMockCategory(String name, List<String> subs) {
-        Category c = new Category();
-        c.setId(UUID.randomUUID());
-        c.setParentName(name);
-        c.setChildren(subs);
-        return c;
+    @GetMapping("/{id}")
+    public ApiResponse<Category> getCategoryById(@PathVariable UUID id) {
+        return ApiResponse.ok(categoryService.getCategoryById(id), 1L);
+    }
+
+    @PostMapping("/add")
+    public ApiResponse<Category> addCategory(@RequestBody Category category) {
+        return ApiResponse.ok(categoryService.createCategory(category), 1L);
+    }
+
+    @PutMapping("/update/{id}")
+    public ApiResponse<Category> updateCategory(@PathVariable UUID id, @RequestBody Category category) {
+        return ApiResponse.ok(categoryService.updateCategory(id, category), 1L);
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ApiResponse<String> deleteCategory(@PathVariable UUID id) {
+        categoryService.deleteCategory(id);
+        return ApiResponse.ok("Kategori başarıyla silindi.", 1L);
     }
 }
