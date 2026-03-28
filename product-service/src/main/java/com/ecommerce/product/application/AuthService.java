@@ -7,6 +7,7 @@ import com.ecommerce.product.dto.auth.RegisterRequest;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,21 +21,16 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
-    private final JwtService jwtService; // Yeni enjekte edilen JWT Servisi
+    private final JwtService jwtService;
 
-    /**
-     * Kullanıcı girişi ve Gerçek JWT üretimi
-     */
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
-        // BCrypt şifre doğrulaması
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
             throw new RuntimeException("E-posta veya şifre hatalı!");
         }
 
-        // GERÇEK JWT TOKEN ÜRETİMİ
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
 
         return new LoginResponse(
@@ -46,9 +42,6 @@ public class AuthService {
         );
     }
 
-    /**
-     * Yeni kullanıcı kaydı (Şifre hashlenerek kaydedilir)
-     */
     @Transactional
     public void registerWithRole(RegisterRequest request, String role) {
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
@@ -57,9 +50,9 @@ public class AuthService {
 
         User newUser = new User();
         newUser.setEmail(request.getEmail());
-        newUser.setPassword(passwordEncoder.encode(request.getPassword())); // Şifre zırhlandı
+        newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setName(request.getName());
-        newUser.setRole(role);
+        newUser.setRole(role != null ? role : "Staff");
 
         userRepository.save(newUser);
     }
@@ -74,39 +67,63 @@ public class AuthService {
     }
 
     /**
-     * Personel Silme - Sadece ADMIN yetkisiyle
+     * PERSONEL SİLME - %100 BACKEND GÜVENLİĞİ
      */
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('Admin')")
     public void deleteUser(UUID id) {
-        if (!userRepository.existsById(id)) {
-            throw new RuntimeException("Silinmek istenen kullanıcı bulunamadı.");
+        // 1. Silinmek istenen kullanıcı var mı?
+        User userToDelete = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
+
+        // 2. BACKEND ÇEKİ: İsteği atan kişinin e-postasını direkt SecurityContext'ten (JWT'den gelen veri) alıyoruz.
+        // Frontend ne gönderirse göndersin, biz sistemdeki aktif kullanıcıya bakıyoruz.
+        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+
+        // 3. Kendi kendini silme denemesi mi?
+        if (userToDelete.getEmail().equalsIgnoreCase(currentUserEmail)) {
+            throw new RuntimeException("Güvenlik ihlali: Kendi hesabınızı silemezsiniz!");
         }
-        userRepository.deleteById(id);
+
+        userRepository.delete(userToDelete);
     }
 
     /**
-     * Profil/Personel Güncelleme
-     * Güvenlik: Ya ADMIN olmalı ya da kullanıcı kendi profilini güncellemeli
+     * ROL GÜNCELLEME - Sadece Admin yapabilir
      */
     @Transactional
-    @PreAuthorize("hasRole('ADMIN') or #id.toString() == authentication.principal.id")
+    @PreAuthorize("hasAuthority('Admin')")
+    public void updateUserRole(UUID id, String newRole) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+
+        // Backend'de rolü sanitize ediyoruz (Sadece Admin veya Staff olabilir)
+        if (newRole.equalsIgnoreCase("Admin")) user.setRole("Admin");
+        else user.setRole("Staff");
+
+        userRepository.save(user);
+    }
+
+    /**
+     * PROFİL GÜNCELLEME
+     * Ya ADMIN olmalı ya da ID, login olan kullanıcının kendi ID'si olmalı.
+     */
+    @Transactional
+    @PreAuthorize("hasAuthority('Admin') or #id.toString() == authentication.principal.id")
     public LoginResponse updateUser(UUID id, RegisterRequest request) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Güncellenecek kullanıcı bulunamadı!"));
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
-        // Temel bilgileri güncelle
         user.setName(request.getName());
         user.setEmail(request.getEmail());
 
-        // Şifre alanı doluysa güncelle, boşsa mevcut şifreyi koru
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
 
         userRepository.save(user);
 
-        // Bilgiler değiştiği için yeni bir Token üretiyoruz (opsiyonel ama sağlıklı)
+        // Bilgiler değiştiği için yetkileri de içeren taze bir token dönüyoruz.
         String newToken = jwtService.generateToken(user.getEmail(), user.getRole());
 
         return new LoginResponse(

@@ -26,7 +26,7 @@ public class DataInitializer implements CommandLineRunner {
             String encodedPassword = passwordEncoder.encode("123456");
             admin.setPassword(encodedPassword);
 
-            admin.setRole("ADMIN");
+            admin.setRole("Admin");
 
             userRepository.save(admin);
             System.out.println(">> Default Admin BCrypt ile oluşturuldu: admin@taha.com / 123456");

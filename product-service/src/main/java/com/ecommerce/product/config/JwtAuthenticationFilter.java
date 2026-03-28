@@ -33,15 +33,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String email = jwtService.extractEmail(token); // JwtService'de bu metodu yazmıştık
 
-        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // Token geçerliyse kullanıcıyı sisteme "Login olmuş" olarak tanıt
-            // Not: Gerçek projede role bilgisi de token'dan çekilip buraya eklenmeli
-            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    email, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        try {
+            String email = jwtService.extractEmail(token);
+            // KRİTİK: Rolü token'dan dinamik olarak çekiyoruz
+            String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
 
-            SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (email != null && role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // Controller'da hasAuthority('Admin') dediğimiz için buraya direkt role ismini veriyoruz.
+                // Eğer hasRole('Admin') deseydik "ROLE_" + role yapmamız gerekirdi.
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        email,
+                        null,
+                        Collections.singletonList(new SimpleGrantedAuthority(role))
+                );
+
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        } catch (Exception e) {
+            // Token geçersizse veya parse edilemiyorsa sessizce devam et, Security kapıyı kapatacaktır.
+            System.err.println("JWT doğrulama hatası: " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);
