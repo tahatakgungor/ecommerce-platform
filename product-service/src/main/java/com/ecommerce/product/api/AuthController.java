@@ -17,37 +17,34 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {
-        "http://localhost:3000",
-        "https://ecommerce-frontend-xryc.vercel.app"
-}, allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.OPTIONS, RequestMethod.PATCH, RequestMethod.DELETE}) // DELETE eklendi
 public class AuthController {
 
     private final AuthService authService;
     private final InvitationService invitationService;
     private final EmailService emailService;
 
-    @GetMapping("/all")
-    public ApiResponse<?> getAllStaff() {
-        return ApiResponse.ok(authService.getAllUsers(), 0L);
+    @PostMapping("/login")
+    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
+        // Gelen isteği logla (Konsolda ne geldiğini gör)
+        System.out.println("Giriş isteği: " + request.email());
+        LoginResponse response = authService.login(request);
+        return ApiResponse.ok(response, 1L);
     }
 
-    // YENİ: Tek bir personeli getir (Edit sayfası için)
+    @GetMapping("/all")
+    public ApiResponse<?> getAllStaff() {
+        return ApiResponse.ok(authService.getAllUsers(), (long) authService.getAllUsers().size());
+    }
+
     @GetMapping("/get/{id}")
     public ApiResponse<User> getStaffById(@PathVariable("id") java.util.UUID id) {
         return ApiResponse.ok(authService.getUserById(id), 1L);
     }
 
-    // YENİ: Personel Sil (ID tipine dikkat: UUID)
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteStaff(@PathVariable("id") java.util.UUID id) {
         authService.deleteUser(id);
         return ApiResponse.ok("Personel başarıyla silindi.", 1L);
-    }
-
-    @PostMapping("/login")
-    public LoginResponse login(@RequestBody LoginRequest request) {
-        return authService.login(request);
     }
 
     @PostMapping("/invite")
@@ -63,7 +60,7 @@ public class AuthController {
         }
 
         return ApiResponse.ok(Map.of(
-                "message", sendEmail ? "Davetiye e-posta ile gönderildi" : "Davetiye oluşturuldu",
+                "message", sendEmail ? "Davetiye gönderildi" : "Davetiye oluşturuldu",
                 "link", inviteLink
         ), 1L);
     }
@@ -77,5 +74,16 @@ public class AuthController {
         authService.registerWithRole(request, invite.getRole());
         invitationService.markAsUsed(invite);
         return ApiResponse.ok("Kayıt başarıyla tamamlandı.", 1L);
+    }
+
+    // AuthController.java içine eklenecek endpoint:
+
+    @PatchMapping("/update-stuff/{id}")
+    public ApiResponse<LoginResponse> updateStaff(
+            @PathVariable("id") java.util.UUID id,
+            @RequestBody RegisterRequest request) {
+
+        LoginResponse updatedUser = authService.updateUser(id, request);
+        return ApiResponse.ok(updatedUser, 1L);
     }
 }

@@ -3,7 +3,6 @@ package com.ecommerce.product.api;
 import com.ecommerce.product.domain.Brand;
 import com.ecommerce.product.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,7 +14,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/brand")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:3000", "https://ecommerce-frontend-xryc.vercel.app"})
 public class BrandController {
 
     @GetMapping("/all")

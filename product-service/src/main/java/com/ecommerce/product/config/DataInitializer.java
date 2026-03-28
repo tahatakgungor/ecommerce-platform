@@ -4,6 +4,7 @@ import com.ecommerce.product.domain.User;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // Eklendi
 import org.springframework.stereotype.Component;
 
 @Component
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
+    private final BCryptPasswordEncoder passwordEncoder; // SecurityConfig'deki bean'i alıyoruz
 
     @Override
     public void run(String... args) throws Exception {
@@ -19,11 +21,15 @@ public class DataInitializer implements CommandLineRunner {
             User admin = new User();
             admin.setName("Default Admin");
             admin.setEmail("admin@taha.com");
-            admin.setPassword("123456"); // Şimdilik plain text (AuthService'in beklediği gibi)
+
+            // KRİTİK NOKTA: Şifreyi kaydederken hash'liyoruz
+            String encodedPassword = passwordEncoder.encode("123456");
+            admin.setPassword(encodedPassword);
+
             admin.setRole("ADMIN");
 
             userRepository.save(admin);
-            System.out.println(">> Default Admin oluşturuldu: admin@taha.com / 123456");
+            System.out.println(">> Default Admin BCrypt ile oluşturuldu: admin@taha.com / 123456");
         }
     }
 }

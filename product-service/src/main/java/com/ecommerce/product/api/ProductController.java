@@ -16,7 +16,6 @@ import java.util.UUID;
 @RequestMapping("/api/products")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:3000", "https://ecommerce-frontend-xryc.vercel.app"})
 public class ProductController {
 
     private final ProductService productService;

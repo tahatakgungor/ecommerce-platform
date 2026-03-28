@@ -1,4 +1,12 @@
 package com.ecommerce.product.dto.auth;
 
-// Harri şablonu "accessToken" ismini bekler
-public record LoginResponse(String accessToken, String email, String name, String role) {}
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.UUID;
+
+public record LoginResponse(
+        @JsonProperty("token") String accessToken,
+        String email,
+        String name,
+        String role,
+        @JsonProperty("_id") UUID id // Frontend'in beklediği _id formatı
+) {}
