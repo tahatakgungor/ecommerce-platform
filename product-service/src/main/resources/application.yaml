@@ -10,7 +10,7 @@ spring:
     password: ${DB_PASSWORD:password}
   jpa:
     hibernate:
-      ddl-auto: update # create-drop da olabilir
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -24,12 +24,14 @@ spring:
       spring.json.add.type.headers: false
     jackson:
       serialization:
-        # Tarihleri "2026, 3, 19..." gibi bir sayı dizisi yerine düzgün bir metin olarak yazması için
         write-dates-as-timestamps: false
+
+# YENİ EKLENEN KISIM:
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:3000}
 
 logging:
   level:
     org.apache.kafka: WARN
     org.springframework.kafka: WARN
-    # Sadece kendi yazdığın logları görmek için:
     com.ecommerce.product: INFO

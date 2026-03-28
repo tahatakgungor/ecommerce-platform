@@ -4,6 +4,7 @@ import com.ecommerce.product.domain.Invitation;
 import com.ecommerce.product.repository.InvitationRepository;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value; // MUTLAKA EKLE
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,14 +18,18 @@ public class InvitationService {
     private final InvitationRepository invitationRepository;
     private final UserRepository userRepository;
 
+    // application.yaml içindeki app.frontend-url değerini çeker
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     @Transactional
     public String createInvitation(String email, String role) {
-        // 1. Kullanıcı zaten sistemde var mı?
+        // 1. Kullanıcı kontrolü
         if (userRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Bu e-posta adresi zaten sisteme kayıtlı!");
         }
 
-        // 2. YENİ EKLE: Zaten gönderilmiş ama kullanılmamış bir davetiyesi varsa eskisini silelim
+        // 2. Kullanılmamış eski davetiyeyi temizle
         invitationRepository.findByEmail(email).ifPresent(oldInvite -> {
             if (!oldInvite.isUsed()) {
                 invitationRepository.delete(oldInvite);
@@ -43,7 +48,8 @@ public class InvitationService {
 
         invitationRepository.save(invite);
 
-        return "https://ecommerce-frontend-xryc.vercel.app/register?token=" + token;
+        // ARTIK BURASI DİNAMİK: Local'de http://localhost:3000, Railway'de Vercel linki olur.
+        return frontendUrl + "/register?token=" + token;
     }
 
     public Invitation validateAndGetInvite(String token) {
