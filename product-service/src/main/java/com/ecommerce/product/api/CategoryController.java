@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,25 +17,23 @@ import java.util.UUID;
 @CrossOrigin(origins = "http://localhost:3000")
 public class CategoryController {
 
+    // private final CategoryService categoryService; // İleride aktif edilecek
+
     @GetMapping("/all")
     public ApiResponse<List<Category>> getAllCategories() {
-        List<Category> categories = new ArrayList<>();
+        // Şimdilik mock veri, ama ApiResponse formatı kesinleştirildi
+        List<Category> categories = List.of(
+                createMockCategory("Electronics", List.of("Mobile", "Laptop")),
+                createMockCategory("Fashion", List.of("Shoes", "Clothing"))
+        );
+        return new ApiResponse<>(true, categories, (long) categories.size());
+    }
 
-        // 1. Kategori
-        Category cat1 = new Category();
-        cat1.setId(UUID.randomUUID());
-        cat1.setParentName("Electronics"); // Ekranda görünecek ana başlık
-        cat1.setChildren(List.of("Mobile", "Laptop", "Tablet")); // Alt kategoriler (String)
-
-        // 2. Kategori
-        Category cat2 = new Category();
-        cat2.setId(UUID.randomUUID());
-        cat2.setParentName("Fashion");
-        cat2.setChildren(List.of("Shoes", "Clothing"));
-
-        categories.add(cat1);
-        categories.add(cat2);
-
-        return new ApiResponse<>(true, categories, 2L);
+    private Category createMockCategory(String name, List<String> subs) {
+        Category c = new Category();
+        c.setId(UUID.randomUUID());
+        c.setParentName(name);
+        c.setChildren(subs);
+        return c;
     }
 }
