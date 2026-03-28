@@ -67,12 +67,13 @@ public class ProductController {
      * Entity'den DTO'ya: Frontend'e veri gönderirken (Response)
      */
     private ProductResponse convertToResponse(Product product) {
+        if (product == null) return null;
+
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
                 .description(product.getDescription())
                 .price(product.getPrice() != null ? product.getPrice() : 0.0)
-                // Harri şablonunun en hassas olduğu nokta: originalPrice asla null gelmemeli
                 .originalPrice(product.getOriginalPrice() != null ? product.getOriginalPrice() :
                         (product.getPrice() != null ? product.getPrice() : 0.0))
                 .stockQuantity(product.getStockQuantity() != null ? product.getStockQuantity() : 0)
@@ -81,8 +82,15 @@ public class ProductController {
                 .status(product.getStatus())
                 .parentCategory(product.getParentCategory())
                 .childCategory(product.getChildCategory())
-                .categoryName(product.getCategoryName())
-                .brandName(product.getBrandName())
+
+                // --- KRİTİK NOKTA: Null Safe Obje Oluşturma ---
+                .brand(new ProductResponse.BrandInfo(
+                        product.getBrandName() != null ? product.getBrandName() : "No Brand"
+                ))
+                .category(new ProductResponse.CategoryInfo(
+                        product.getCategoryName() != null ? product.getCategoryName() : "General"
+                ))
+
                 .tags(product.getTags())
                 .colors(product.getColors())
                 .build();

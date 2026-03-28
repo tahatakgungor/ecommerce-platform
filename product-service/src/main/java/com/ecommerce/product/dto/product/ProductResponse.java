@@ -1,11 +1,7 @@
 package com.ecommerce.product.dto.product;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
+import lombok.*;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,13 +18,8 @@ public class ProductResponse {
     private String name;
 
     private String description;
-
-    // --- FRONTEND UYUMLULUK ALANLARI ---
-    @JsonProperty("price")
     private Double price;
-
-    @JsonProperty("originalPrice")
-    private Double originalPrice; // Detay sayfasındaki toFixed hatasını önler
+    private Double originalPrice;
 
     @JsonProperty("quantity")
     private Integer stockQuantity;
@@ -37,18 +28,34 @@ public class ProductResponse {
     private String image;
     private String status;
 
+    // --- AKILLICA ÇÖZÜM: Obje Yapısı ---
+    @JsonProperty("brand")
+    private BrandInfo brand;
+
+    @JsonProperty("category")
+    private CategoryInfo category;
+
     @JsonProperty("parent")
     private String parentCategory;
 
     @JsonProperty("children")
     private String childCategory;
 
-    @JsonProperty("category")
-    private String categoryName;
-
-    @JsonProperty("brand")
-    private String brandName;
-
     private List<String> tags;
     private List<String> colors;
+
+    // Frontend'in .name okuyabilmesi için iç sınıflar
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class BrandInfo {
+        private String name;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class CategoryInfo {
+        private String name;
+    }
 }
