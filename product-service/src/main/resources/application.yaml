@@ -10,7 +10,11 @@ spring:
     password: ${DB_PASSWORD:password}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: update # create-drop da olabilir
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
   kafka:
     bootstrap-servers: ${KAFKA_SERVER:localhost:9092}
     producer:
