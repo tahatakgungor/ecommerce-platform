@@ -55,9 +55,22 @@ public class AuthService {
         userRepository.save(newUser);
     }
 
-    // AuthService.java içine
-
     public List<User> getAllUsers() {
         return userRepository.findAll();
+    }
+
+    // YENİ: ID ile kullanıcı bul
+    public User getUserById(java.util.UUID id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+    }
+
+    // YENİ: Kullanıcı sil
+    @Transactional
+    public void deleteUser(java.util.UUID id) {
+        if (!userRepository.existsById(id)) {
+            throw new RuntimeException("Silinmek istenen kullanıcı bulunamadı.");
+        }
+        userRepository.deleteById(id);
     }
 }
