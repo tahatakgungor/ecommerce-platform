@@ -1,28 +1,63 @@
 package com.ecommerce.product.application;
 
-import com.ecommerce.product.dto.LoginRequest;
-import com.ecommerce.product.dto.LoginResponse;
+import com.ecommerce.product.domain.User;
+import com.ecommerce.product.dto.auth.LoginRequest;
+import com.ecommerce.product.dto.auth.LoginResponse;
+import com.ecommerce.product.dto.auth.RegisterRequest;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
+    // Şimdilik BCrypt eklemediysen direkt String kontrolü yaparız,
+    // ama gerçek projede passwordEncoder kullanmalısın.
 
     public LoginResponse login(LoginRequest request) {
-        // ŞİMDİLİK: Basit bir kontrol yapıyoruz.
-        // Gerçek projede burada şifre hash kontrolü ve JWT üretimi olur.
-        if ("admin@test.com".equals(request.email()) && "123456".equals(request.password())) {
-            return new LoginResponse(
-                    "fake-jwt-token-harr-123", // Frontend'i içeri sokacak anahtar
-                    request.email(),
-                    "Admin User",
-                    "ADMIN"
-            );
+        // 1. Kullanıcıyı veritabanında ara
+        User user = userRepository.findByEmail(request.email())
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+
+        // 2. Şifre kontrolü (Şimdilik düz metin, ileride encode edilecek)
+        if (!user.getPassword().equals(request.password())) {
+            throw new RuntimeException("E-posta veya şifre hatalı!");
         }
-        throw new RuntimeException("E-posta veya şifre hatalı!");
+
+        // 3. Başarılı giriş: Kullanıcı bilgilerini dön
+        // NOT: "fake-jwt-token..." kısmını ileride gerçek JWT ile değiştireceğiz.
+        return new LoginResponse(
+                "fake-jwt-token-" + user.getId(),
+                user.getEmail(),
+                user.getName(),
+                user.getRole()
+        );
+    }
+
+    @Transactional
+    public void registerWithRole(RegisterRequest request, String role) {
+        // Email mükerrer kayıt kontrolü
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            throw new RuntimeException("Bu email zaten kullanımda!");
+        }
+
+        User newUser = new User();
+        newUser.setEmail(request.getEmail());
+        newUser.setPassword(request.getPassword()); // İleride: passwordEncoder.encode(...)
+        newUser.setName(request.getName());
+        newUser.setRole(role); // Davetiyeden gelen rol (ADMIN/STAFF)
+
+        userRepository.save(newUser);
+    }
+
+    // AuthService.java içine
+
+    public List<User> getAllUsers() {
+        return userRepository.findAll();
     }
 }

@@ -10,23 +10,34 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ApiResponse<T> {
     private boolean success;
-
-    // Senin mevcut kullandığın alan
     private T data;
+    private String message;
+    private Long total;
 
-    // Harri şablonunun (Next.js) beklediği alan
-    // JsonProperty sayesinde JSON çıktısında "result" olarak görünür
     @JsonProperty("result")
     public T getResult() {
         return data;
     }
 
-    private Long total;
-
-    // Kolaylık sağlaması için constructor (eğer total göndermeyeceksen)
-    public ApiResponse(boolean success, T data) {
+    // 1. ESKİ KODLAR İÇİN (Brand, Product vb.): 3 Parametreli
+    public ApiResponse(boolean success, T data, Long total) {
         this.success = success;
         this.data = data;
-        this.total = data instanceof java.util.Collection ? (long) ((java.util.Collection<?>) data).size() : 1L;
+        this.total = total;
+        this.message = success ? "Success" : "Error";
+    }
+
+    // 2. HATALAR VE MESAJLAR İÇİN: Sadece Mesaj dönen statik metodlar (Çakışmayı önler)
+    // Constructor yerine bunları kullanmak "Related Problems" hatasını bitirir.
+    public static <T> ApiResponse<T> ok(T data, Long total) {
+        return new ApiResponse<>(true, data, total);
+    }
+
+    public static <T> ApiResponse<T> error(String message) {
+        ApiResponse<T> response = new ApiResponse<>();
+        response.setSuccess(false);
+        response.setMessage(message);
+        response.setTotal(0L);
+        return response;
     }
 }

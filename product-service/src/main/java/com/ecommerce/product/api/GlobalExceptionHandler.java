@@ -15,12 +15,14 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<String> handleAllExceptions(Exception ex) {
         log.error("Beklenmedik bir hata oluştu: ", ex);
-        return new ApiResponse<>(false, "Sunucu taraflı bir hata oluştu: " + ex.getMessage(), 0L);
+        // ApiResponse içindeki static error metodunu kullanıyoruz
+        return ApiResponse.error("Sunucu hatası: " + ex.getMessage());
     }
 
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<String> handleRuntimeExceptions(RuntimeException ex) {
-        return new ApiResponse<>(false, ex.getMessage(), 0L);
+        // Hata mesajını doğrudan error metoduyla dönüyoruz
+        return ApiResponse.error(ex.getMessage());
     }
 }
