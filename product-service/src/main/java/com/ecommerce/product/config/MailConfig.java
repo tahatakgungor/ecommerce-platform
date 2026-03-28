@@ -49,7 +49,8 @@ public class MailConfig {
         props.put("mail.smtp.timeout", "10000");
 
         props.put("mail.debug", "true");
-
+        // MailConfig.java içine ekle
+        System.setProperty("java.net.preferIPv4Stack" , "true");
         return mailSender;
     }
 }
