@@ -25,11 +25,9 @@ spring:
     jackson:
       serialization:
         write-dates-as-timestamps: false
-
-  # MAIL AYARLARI (GÜNCELLENDİ)
   mail:
     host: smtp.gmail.com
-    port: 465
+    port: 587
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
@@ -37,13 +35,11 @@ spring:
         smtp:
           auth: true
           starttls:
-            enable: false # SSL (465) kullanırken starttls genelde false olur
-          ssl:
             enable: true
-          socketFactory:
-            port: 465
-            class: javax.net.ssl.SSLSocketFactory
-            fallback: false
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
