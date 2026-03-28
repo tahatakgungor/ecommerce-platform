@@ -10,6 +10,7 @@ import com.ecommerce.product.dto.auth.LoginRequest;
 import com.ecommerce.product.dto.auth.LoginResponse;
 import com.ecommerce.product.dto.auth.RegisterRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -42,25 +43,30 @@ public class AuthController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')") // Staff silemesin demiştik
     public ApiResponse<String> deleteStaff(@PathVariable("id") java.util.UUID id) {
         authService.deleteUser(id);
         return ApiResponse.ok("Personel başarıyla silindi.", 1L);
     }
 
+    // Sadece ADMIN davet edebilir - Güvenlik katmanı
     @PostMapping("/invite")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Map<String, String>> inviteStaff(@RequestBody Map<String, Object> request) {
         String email = (String) request.get("email");
         String role = (String) request.get("role");
         boolean sendEmail = (boolean) request.getOrDefault("sendEmail", false);
 
+        // Davetiyeyi oluştur
         String inviteLink = invitationService.createInvitation(email, role);
 
+        // Eğer admin onayladıysa ve checkbox işaretliyse mail at
         if (sendEmail) {
             emailService.sendInviteEmail(email, inviteLink);
         }
 
         return ApiResponse.ok(Map.of(
-                "message", sendEmail ? "Davetiye gönderildi" : "Davetiye oluşturuldu",
+                "message", sendEmail ? "Davetiye e-posta ile gönderildi" : "Davetiye linki oluşturuldu",
                 "link", inviteLink
         ), 1L);
     }
