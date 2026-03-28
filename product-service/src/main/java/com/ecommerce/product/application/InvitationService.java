@@ -19,7 +19,7 @@ public class InvitationService {
     private final UserRepository userRepository;
 
     // application.yaml içindeki app.frontend-url değerini çeker
-    @Value("${FRONTEND_URL}")
+    @Value("${app.frontend-url}")
     private String frontendUrl;
 
     @Transactional
