@@ -27,6 +27,7 @@ public class ProductResponse {
     private String sku;
     private String image;
     private String status;
+    private Integer discount;
 
     // --- AKILLICA ÇÖZÜM: Obje Yapısı ---
     @JsonProperty("brand")

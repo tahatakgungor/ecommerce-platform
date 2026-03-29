@@ -52,12 +52,19 @@ public class ProductClientController {
     // GET /api/products/{id}  — admin controller'da da var, burada tekrar açmıyoruz
 
     private ProductResponse toResponse(Product p) {
+        double price = p.getPrice() != null ? p.getPrice() : 0.0;
+        double originalPrice = p.getOriginalPrice() != null ? p.getOriginalPrice() : price;
+        int discount = 0;
+        if (originalPrice > 0 && originalPrice > price) {
+            discount = (int) Math.round((1 - price / originalPrice) * 100);
+        }
         return ProductResponse.builder()
                 .id(p.getId())
                 .name(p.getName())
                 .description(p.getDescription())
-                .price(p.getPrice() != null ? p.getPrice() : 0.0)
-                .originalPrice(p.getOriginalPrice() != null ? p.getOriginalPrice() : (p.getPrice() != null ? p.getPrice() : 0.0))
+                .price(price)
+                .originalPrice(originalPrice)
+                .discount(discount)
                 .stockQuantity(p.getStockQuantity() != null ? p.getStockQuantity() : 0)
                 .sku(p.getSku())
                 .image(p.getImage())

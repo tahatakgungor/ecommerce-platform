@@ -83,29 +83,27 @@ public class ProductController {
      */
     private ProductResponse convertToResponse(Product product) {
         if (product == null) return null;
-
+        double price = product.getPrice() != null ? product.getPrice() : 0.0;
+        double originalPrice = product.getOriginalPrice() != null ? product.getOriginalPrice() : price;
+        int discount = 0;
+        if (originalPrice > 0 && originalPrice > price) {
+            discount = (int) Math.round((1 - price / originalPrice) * 100);
+        }
         return ProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
                 .description(product.getDescription())
-                .price(product.getPrice() != null ? product.getPrice() : 0.0)
-                .originalPrice(product.getOriginalPrice() != null ? product.getOriginalPrice() :
-                        (product.getPrice() != null ? product.getPrice() : 0.0))
+                .price(price)
+                .originalPrice(originalPrice)
+                .discount(discount)
                 .stockQuantity(product.getStockQuantity() != null ? product.getStockQuantity() : 0)
                 .sku(product.getSku())
                 .image(product.getImage())
                 .status(product.getStatus())
                 .parentCategory(product.getParentCategory())
                 .childCategory(product.getChildCategory())
-
-                // --- KRİTİK NOKTA: Null Safe Obje Oluşturma ---
-                .brand(new ProductResponse.BrandInfo(
-                        product.getBrandName() != null ? product.getBrandName() : "No Brand"
-                ))
-                .category(new ProductResponse.CategoryInfo(
-                        product.getCategoryName() != null ? product.getCategoryName() : "General"
-                ))
-
+                .brand(new ProductResponse.BrandInfo(product.getBrandName() != null ? product.getBrandName() : ""))
+                .category(new ProductResponse.CategoryInfo(product.getCategoryName() != null ? product.getCategoryName() : ""))
                 .tags(product.getTags())
                 .colors(product.getColors())
                 .build();
