@@ -49,6 +49,7 @@ public class SecurityConfig {
         // allowedOrigins yerine allowedOriginPatterns kullanmak "*" hatalarını daha iyi yönetir
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:3000",
+                "http://localhost:3001", // DASHBOARD PORTU BURAYA EKLENDİ
                 "https://ecommerce-frontend-xryc.vercel.app"
         ));
 

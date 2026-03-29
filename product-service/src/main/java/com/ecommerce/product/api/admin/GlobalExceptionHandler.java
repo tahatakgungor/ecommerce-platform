@@ -1,4 +1,4 @@
-package com.ecommerce.product.api;
+package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;

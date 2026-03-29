@@ -1,9 +1,10 @@
-package com.ecommerce.product.api;
+package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.application.BrandService;
 import com.ecommerce.product.domain.Brand;
 import com.ecommerce.product.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/brand")
 @RequiredArgsConstructor
+@Slf4j
 public class BrandController {
 
     private final BrandService brandService;
@@ -39,6 +41,7 @@ public class BrandController {
 
     @DeleteMapping("/delete/{id}")
     public ApiResponse<String> deleteBrand(@PathVariable UUID id) {
+        log.info("Admin marka siliyor: ID {}", id); // @Slf4j eklemeyi unutma
         brandService.deleteBrand(id);
         return ApiResponse.ok("Marka başarıyla silindi.", 1L);
     }

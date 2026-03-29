@@ -1,4 +1,4 @@
-package com.ecommerce.product.api;
+package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.application.FileUploadService;
 import com.ecommerce.product.dto.ApiResponse;

@@ -1,4 +1,4 @@
-package com.ecommerce.product.api;
+package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.application.ProductService;
 import com.ecommerce.product.domain.Product;
@@ -22,6 +22,9 @@ public class ProductController {
 
     private final ProductService productService;
 
+    /**
+     * Tüm ürünleri listeler (Admin Paneli Tablosu için)
+     */
     @GetMapping("/all")
     public ApiResponse<List<ProductResponse>> getAllProducts() {
         List<Product> products = productService.findAll();
@@ -34,6 +37,9 @@ public class ProductController {
         return ApiResponse.ok(responses, (long) responses.size());
     }
 
+    /**
+     * Yeni ürün ekler
+     */
     @PostMapping("/add")
     public ApiResponse<ProductResponse> createProduct(@RequestBody ProductRequest request) {
         log.info("Yeni ürün ekleniyor: {}", request.getName());
@@ -42,12 +48,18 @@ public class ProductController {
         return ApiResponse.ok(convertToResponse(saved), 1L);
     }
 
+    /**
+     * ID ile tekil ürün getirir (Düzenleme ekranı için)
+     */
     @GetMapping("/{id}")
     public ApiResponse<ProductResponse> getProductById(@PathVariable("id") UUID id) {
         Product product = productService.findById(id);
         return ApiResponse.ok(convertToResponse(product), 1L);
     }
 
+    /**
+     * Mevcut ürünü günceller
+     */
     @PutMapping("/update/{id}")
     public ApiResponse<ProductResponse> updateProduct(@PathVariable("id") UUID id, @RequestBody ProductRequest request) {
         Product product = convertToEntity(request);
@@ -55,13 +67,16 @@ public class ProductController {
         return ApiResponse.ok(convertToResponse(updated), 1L);
     }
 
+    /**
+     * Ürünü siler
+     */
     @DeleteMapping("/{id}")
     public ApiResponse<String> deleteProduct(@PathVariable("id") UUID id) {
         productService.delete(id);
         return ApiResponse.ok("Ürün başarıyla silindi!", 1L);
     }
 
-    // --- MAPPING METODLARI (PRO LEVEL) ---
+    // --- MAPPING LOGIC ---
 
     /**
      * Entity'den DTO'ya: Frontend'e veri gönderirken (Response)
@@ -111,6 +126,7 @@ public class ProductController {
         // Fiyat Ayarı
         if (request.getPrice() != null) {
             product.setPrice(request.getPrice());
+            // Eğer indirimli fiyat mantığı yoksa originalPrice=price eşlenir
             product.setOriginalPrice(request.getPrice());
         }
 
@@ -125,11 +141,13 @@ public class ProductController {
     }
 
     /**
-     * Gelen veri String ise direkt döner, Map (Object) ise içindeki 'name' veya 'url' alanını bulur.
+     * Admin panelinden veya Client'tan gelen verinin tipine bakmaksızın
+     * (String, URL objesi, Kategori objesi vb.) ham metni dışarı çıkarır.
      */
     private String extractString(Object obj) {
         if (obj == null) return null;
         if (obj instanceof String) return (String) obj;
+
         if (obj instanceof Map) {
             Map<?, ?> map = (Map<?, ?>) obj;
             // Kategori/Brand için genelde 'name', Resim için 'url' kullanılır

@@ -44,6 +44,10 @@ public class Product {
     @JsonProperty("children")
     private String childCategory;
 
+    // Mevcut alanların yanına ekle (Örneğin categoryName'in hemen üstüne)
+    @JsonProperty("categoryId")
+    private UUID categoryId;
+
     @JsonProperty("category")
     private String categoryName;
 

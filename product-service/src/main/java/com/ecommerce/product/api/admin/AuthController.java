@@ -1,4 +1,4 @@
-package com.ecommerce.product.api;
+package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.application.AuthService;
 import com.ecommerce.product.application.EmailService;
