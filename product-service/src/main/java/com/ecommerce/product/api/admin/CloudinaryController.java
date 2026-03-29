@@ -20,7 +20,7 @@ public class CloudinaryController {
         // Canlıya çıkışta buraya CloudinaryService gelecek.
         // Şimdilik Frontend'i kırmamak için sabit yapı:
         Map<String, String> response = Map.of(
-                "url", "https://via.placeholder.com/600x400?text=Yuklenen+Resim",
+                "url", "https://placehold.co/600x400?text=Yuklenen+Resim",
                 "id", "temp_" + UUID.randomUUID().toString()
         );
 
