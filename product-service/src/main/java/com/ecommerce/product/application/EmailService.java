@@ -17,6 +17,24 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    public void sendPasswordResetEmail(String toEmail, String resetToken) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(toEmail);
+            message.setSubject("Şifre Sıfırlama");
+            message.setText("Merhaba,\n\n" +
+                    "Şifrenizi sıfırlamak için aşağıdaki token'ı kullanın:\n\n" +
+                    resetToken + "\n\n" +
+                    "Not: Bu token 24 saat geçerlidir.\n" +
+                    "Eğer bu isteği siz yapmadıysanız bu e-postayı görmezden gelin.");
+            mailSender.send(message);
+            log.info("Şifre sıfırlama e-postası gönderildi: {}", toEmail);
+        } catch (Exception e) {
+            log.error("E-posta gönderimi sırasında hata oluştu: {}", e.getMessage());
+        }
+    }
+
     public void sendInviteEmail(String toEmail, String inviteLink) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

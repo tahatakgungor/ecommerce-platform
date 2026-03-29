@@ -19,5 +19,7 @@ public class User {
     private String password;
 
     private String name;
-    private String role; // Şimdilik "ADMIN" kullanacağız
+    private String role;
+    private String phone;
+    private String passwordResetToken;
 }

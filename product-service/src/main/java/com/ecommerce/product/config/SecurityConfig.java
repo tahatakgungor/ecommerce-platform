@@ -31,9 +31,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Auth endpoint'leri
+                        // Admin auth endpoint'leri
                         .requestMatchers("/api/admin/login").permitAll()
                         .requestMatchers("/api/admin/register").permitAll()
+                        // Müşteri auth endpoint'leri
+                        .requestMatchers("/api/user/signup").permitAll()
+                        .requestMatchers("/api/user/login").permitAll()
+                        .requestMatchers("/api/user/confirmEmail/**").permitAll()
+                        .requestMatchers("/api/user/forget-password").permitAll()
+                        .requestMatchers("/api/user/confirm-forget-password").permitAll()
                         // Müşteri tarafı public endpoint'ler
                         .requestMatchers("/api/products/show").permitAll()
                         .requestMatchers("/api/products/{id}").permitAll()
