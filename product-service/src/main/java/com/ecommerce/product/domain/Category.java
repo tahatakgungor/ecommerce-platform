@@ -36,7 +36,8 @@ public class Category {
         return name;
     }
 
-    @Transient
+    @ElementCollection
+    @CollectionTable(name = "category_children", joinColumns = @JoinColumn(name = "category_id"))
     @JsonProperty("children")
     private List<String> children = new ArrayList<>();
 }
