@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/relatedProduct").permitAll()
                         .requestMatchers("/api/category/show").permitAll()
                         .requestMatchers("/api/brand/all").permitAll()
+                        .requestMatchers("/api/category/all").permitAll()
                         .requestMatchers("/api/coupon").permitAll()
                         // Dashboard (authenticated olmayan kullanıcılar için boş dönüyor zaten)
                         .requestMatchers("/api/order/**").permitAll()
