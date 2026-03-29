@@ -28,8 +28,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 465
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -41,7 +41,7 @@ spring:
 
 app:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:local-dev-secret-key-must-be-at-least-32-chars}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
 
 logging:
