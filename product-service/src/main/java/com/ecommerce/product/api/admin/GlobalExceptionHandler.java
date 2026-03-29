@@ -11,18 +11,19 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    // RuntimeException önce yakalanmalı (daha spesifik)
+    @ExceptionHandler(RuntimeException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse<String> handleRuntimeExceptions(RuntimeException ex) {
+        log.warn("İş mantığı hatası: {}", ex.getMessage());
+        return ApiResponse.error(ex.getMessage());
+    }
+
+    // Genel Exception en sona
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<String> handleAllExceptions(Exception ex) {
         log.error("Beklenmedik bir hata oluştu: ", ex);
-        // ApiResponse içindeki static error metodunu kullanıyoruz
         return ApiResponse.error("Sunucu hatası: " + ex.getMessage());
-    }
-
-    @ExceptionHandler(RuntimeException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ApiResponse<String> handleRuntimeExceptions(RuntimeException ex) {
-        // Hata mesajını doğrudan error metoduyla dönüyoruz
-        return ApiResponse.error(ex.getMessage());
     }
 }

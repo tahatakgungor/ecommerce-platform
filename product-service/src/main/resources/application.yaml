@@ -40,6 +40,8 @@ spring:
           timeout: 10000
 
 app:
+  jwt:
+    secret: ${JWT_SECRET}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
 
 logging:

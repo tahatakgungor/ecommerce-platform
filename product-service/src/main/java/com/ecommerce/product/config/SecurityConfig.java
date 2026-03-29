@@ -14,13 +14,15 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-@RequiredArgsConstructor // Lombok'un constructor oluşturması için şart
+@RequiredArgsConstructor
 public class SecurityConfig {
-    private final JwtAuthenticationFilter jwtAuthFilter; // Filtreyi inject et
+
+    private final JwtAuthenticationFilter jwtAuthFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -29,15 +31,28 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/login", "/api/admin/register").permitAll()
-                        // HATA ALDIĞIN YERLERİ ŞİMDİLİK AÇIYORUZ:
-                        .requestMatchers("/api/order/**", "/api/user-order/**").permitAll()
-                        .requestMatchers("/api/admin/**").authenticated()
+                        // Auth endpoint'leri
+                        .requestMatchers("/api/admin/login").permitAll()
+                        .requestMatchers("/api/admin/register").permitAll()
+                        // Müşteri tarafı public endpoint'ler
+                        .requestMatchers("/api/products/show").permitAll()
+                        .requestMatchers("/api/products/{id}").permitAll()
+                        .requestMatchers("/api/products/discount").permitAll()
+                        .requestMatchers("/api/products/relatedProduct").permitAll()
+                        .requestMatchers("/api/category/show").permitAll()
+                        .requestMatchers("/api/brand/all").permitAll()
+                        .requestMatchers("/api/coupon").permitAll()
+                        // Dashboard (authenticated olmayan kullanıcılar için boş dönüyor zaten)
+                        .requestMatchers("/api/order/**").permitAll()
+                        .requestMatchers("/api/user-order/**").permitAll()
+                        // Static dosyalar
+                        .requestMatchers("/uploads/**").permitAll()
+                        // Geri kalan her şey authentication gerektirir
                         .anyRequest().authenticated()
                 );
 
-        // JWT Filtresini ekle (UsernamePassword filtresinden önce çalışsın)
-        http.addFilterBefore(jwtAuthFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(jwtAuthFilter,
+                org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -45,20 +60,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-
-        // allowedOrigins yerine allowedOriginPatterns kullanmak "*" hatalarını daha iyi yönetir
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:3000",
-                "http://localhost:3001", // DASHBOARD PORTU BURAYA EKLENDİ
-                "https://ecommerce-frontend-xryc.vercel.app"
+                "http://localhost:3001",
+                "https://ecommerce-frontend-xryc.vercel.app",
+                "https://*.vercel.app"
         ));
-
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With", "Accept"));
         configuration.setAllowCredentials(true);
-
-        // Header'ların dışarıya sızmasına izin ver (Token bazen gerekebilir)
-        configuration.setExposedHeaders(Arrays.asList("Authorization"));
+        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
