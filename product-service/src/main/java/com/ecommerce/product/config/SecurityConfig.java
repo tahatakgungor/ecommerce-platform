@@ -49,9 +49,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/brand/all").permitAll()
                         .requestMatchers("/api/category/all").permitAll()
                         .requestMatchers("/api/coupon").permitAll()
-                        // Dashboard (authenticated olmayan kullanıcılar için boş dönüyor zaten)
-                        .requestMatchers("/api/order/**").permitAll()
-                        .requestMatchers("/api/user-order/**").permitAll()
                         // Static dosyalar
                         .requestMatchers("/uploads/**").permitAll()
                         // Geri kalan her şey authentication gerektirir
