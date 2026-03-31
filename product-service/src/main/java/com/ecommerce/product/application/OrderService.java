@@ -273,8 +273,45 @@ public class OrderService {
     // ---------- Dashboard: en çok satan kategori ----------
 
     public Map<String, Object> getMostSellingCategory() {
-        // Cart JSON içinde category bilgisi yok; boş döndür.
-        return Map.of("categoryData", List.of());
+        List<Order> orders = orderRepository.findAll();
+        Map<String, Integer> categoryCount = new LinkedHashMap<>();
+
+        for (Order order : orders) {
+            if (order.getCart() == null || order.getCart().isBlank()) continue;
+            try {
+                List<Map<String, Object>> cartItems = objectMapper.readValue(
+                        order.getCart(), new TypeReference<List<Map<String, Object>>>() {});
+                for (Map<String, Object> item : cartItems) {
+                    Object categoryObj = item.get("category");
+                    String categoryName = null;
+                    if (categoryObj instanceof Map) {
+                        Object nameObj = ((Map<?, ?>) categoryObj).get("name");
+                        if (nameObj != null) categoryName = nameObj.toString();
+                    } else if (categoryObj instanceof String) {
+                        categoryName = (String) categoryObj;
+                    }
+                    if (categoryName != null && !categoryName.isBlank()) {
+                        Object qty = item.get("orderQuantity");
+                        int quantity = qty != null ? Integer.parseInt(qty.toString()) : 1;
+                        categoryCount.merge(categoryName, quantity, Integer::sum);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Cart JSON parse hatası (orderId={}): {}", order.getId(), e.getMessage());
+            }
+        }
+
+        List<Map<String, Object>> categoryData = categoryCount.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("_id", e.getKey());
+                    m.put("count", e.getValue());
+                    return m;
+                })
+                .collect(Collectors.toList());
+
+        return Map.of("categoryData", categoryData);
     }
 
     // ---------- Yardımcı ----------
