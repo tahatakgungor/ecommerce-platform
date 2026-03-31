@@ -16,7 +16,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -190,5 +192,96 @@ public class OrderService {
         } catch (Exception e) {
             return 0.0;
         }
+    }
+
+    // ---------- Dashboard: özet kartlar ----------
+
+    public Map<String, Object> getDashboardAmount() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime todayEnd = todayStart.plusDays(1);
+        LocalDateTime yesterdayStart = todayStart.minusDays(1);
+        LocalDateTime monthStart = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+
+        double todayAmount = sumAmounts(orderRepository.findByCreatedAtBetween(todayStart, todayEnd));
+        double yesterdayAmount = sumAmounts(orderRepository.findByCreatedAtBetween(yesterdayStart, todayStart));
+        double monthlyAmount = sumAmounts(orderRepository.findByCreatedAtBetween(monthStart, todayEnd));
+        double totalAmount = sumAmounts(orderRepository.findAll());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("todayOrderAmount", todayAmount);
+        result.put("yesterdayOrderAmount", yesterdayAmount);
+        result.put("monthlyOrderAmount", monthlyAmount);
+        result.put("totalOrderAmount", totalAmount);
+        result.put("todayCardPaymentAmount", 0);
+        result.put("todayCashPaymentAmount", 0);
+        result.put("yesterDayCardPaymentAmount", 0);
+        result.put("yesterDayCashPaymentAmount", 0);
+        return result;
+    }
+
+    // ---------- Dashboard: son siparişler ----------
+
+    public Map<String, Object> getDashboardRecentOrders() {
+        List<Order> all = orderRepository.findAllByOrderByCreatedAtDesc();
+        List<Map<String, Object>> orders = all.stream()
+                .limit(10)
+                .map(o -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("_id", o.getId().toString());
+                    m.put("name", o.getName() != null ? o.getName() : "");
+                    m.put("totalAmount", o.getTotalAmount() != null ? o.getTotalAmount() : 0.0);
+                    m.put("paymentMethod", "");
+                    m.put("status", o.getStatus() != null ? o.getStatus() : "pending");
+                    m.put("createdAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
+                    m.put("updatedAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
+                    m.put("invoice", o.getInvoice() != null ? o.getInvoice() : "");
+                    return m;
+                })
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("orders", orders);
+        result.put("totalOrder", all.size());
+        return result;
+    }
+
+    // ---------- Dashboard: satış raporu (son 30 gün) ----------
+
+    public Map<String, Object> getSalesReport() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        List<Order> orders = orderRepository.findByCreatedAtAfter(thirtyDaysAgo);
+
+        Map<String, List<Order>> byDate = orders.stream()
+                .filter(o -> o.getCreatedAt() != null)
+                .collect(Collectors.groupingBy(o -> o.getCreatedAt().toLocalDate().toString()));
+
+        List<Map<String, Object>> salesReport = byDate.entrySet().stream()
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("date", e.getKey());
+                    m.put("total", sumAmounts(e.getValue()));
+                    m.put("order", e.getValue().size());
+                    return m;
+                })
+                .sorted(Comparator.comparing(m -> (String) m.get("date")))
+                .collect(Collectors.toList());
+
+        return Map.of("salesReport", salesReport);
+    }
+
+    // ---------- Dashboard: en çok satan kategori ----------
+
+    public Map<String, Object> getMostSellingCategory() {
+        // Cart JSON içinde category bilgisi yok; boş döndür.
+        return Map.of("categoryData", List.of());
+    }
+
+    // ---------- Yardımcı ----------
+
+    private double sumAmounts(List<Order> orders) {
+        return orders.stream()
+                .mapToDouble(o -> o.getTotalAmount() != null ? o.getTotalAmount() : 0.0)
+                .sum();
     }
 }

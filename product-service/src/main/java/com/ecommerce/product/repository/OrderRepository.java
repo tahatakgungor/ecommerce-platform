@@ -3,9 +3,13 @@ package com.ecommerce.product.repository;
 import com.ecommerce.product.domain.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByUserIdOrderByCreatedAtDesc(String userId);
+    List<Order> findByCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+    List<Order> findByCreatedAtAfter(LocalDateTime date);
+    List<Order> findAllByOrderByCreatedAtDesc();
 }

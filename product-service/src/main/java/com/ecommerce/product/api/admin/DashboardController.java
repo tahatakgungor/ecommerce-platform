@@ -1,46 +1,59 @@
 package com.ecommerce.product.api.admin;
 
+import com.ecommerce.product.application.OrderService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
+
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/user-order")
+@RequiredArgsConstructor
 @Slf4j
 public class DashboardController {
 
+    private final OrderService orderService;
+
     /**
-     * Dashboard Kart Verileri
-     * KÖKTEN ÇÖZÜM: ApiResponse sarmalayıcısını kaldırıyoruz.
-     * Frontend direkt bu objeyi 'dashboardOrderAmount' olarak alacak.
+     * Dashboard kart verileri:
+     * { todayOrderAmount, yesterdayOrderAmount, monthlyOrderAmount, totalOrderAmount,
+     *   todayCardPaymentAmount, todayCashPaymentAmount,
+     *   yesterDayCardPaymentAmount, yesterDayCashPaymentAmount }
      */
     @GetMapping("/dashboard-amount")
     public Map<String, Object> getDashboardAmount() {
-        log.info("Dashboard verileri RAW formatta gönderiliyor...");
-
-        // Frontend'in card-items.tsx içinde beklediği TAM yapı:
-        return Map.of(
-                "totalOrder", 0,
-                "pendingOrder", 0,
-                "totalOrderAmount", 0.0, // toFixed(2) için sayısal değer
-                "todayRevenue", 0.0
-        );
+        log.info("Dashboard amount isteği alındı");
+        return orderService.getDashboardAmount();
     }
 
-    // Diğer endpoint'leri de sarmalayıcı olmadan (raw) dönelim ki onlar da patlamasın
-    @GetMapping("/most-selling-category")
-    public List<Object> getMostSellingCategory() {
-        return List.of();
-    }
-
-    @GetMapping("/sales-report")
-    public List<Object> getSalesReport() {
-        return List.of();
-    }
-
+    /**
+     * Son siparişler:
+     * { orders: [...], totalOrder: N }
+     */
     @GetMapping("/dashboard-recent-order")
-    public List<Object> getRecentOrders() {
-        return List.of();
+    public Map<String, Object> getRecentOrders() {
+        log.info("Dashboard recent orders isteği alındı");
+        return orderService.getDashboardRecentOrders();
+    }
+
+    /**
+     * Satış raporu (son 30 gün, güne göre gruplu):
+     * { salesReport: [{ date, total, order }] }
+     */
+    @GetMapping("/sales-report")
+    public Map<String, Object> getSalesReport() {
+        log.info("Dashboard sales report isteği alındı");
+        return orderService.getSalesReport();
+    }
+
+    /**
+     * En çok satan kategori:
+     * { categoryData: [{ _id, count }] }
+     */
+    @GetMapping("/most-selling-category")
+    public Map<String, Object> getMostSellingCategory() {
+        log.info("Dashboard most selling category isteği alındı");
+        return orderService.getMostSellingCategory();
     }
 }
