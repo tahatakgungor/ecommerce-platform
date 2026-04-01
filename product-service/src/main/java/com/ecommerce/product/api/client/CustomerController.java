@@ -5,6 +5,8 @@ import com.ecommerce.product.dto.ApiResponse;
 import com.ecommerce.product.dto.auth.CustomerLoginResponse;
 import com.ecommerce.product.dto.auth.CustomerSignupRequest;
 import com.ecommerce.product.dto.auth.CustomerUserDto;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -29,13 +31,43 @@ public class CustomerController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<CustomerLoginResponse>> login(@RequestBody Map<String, String> body) {
+    public ResponseEntity<ApiResponse<CustomerLoginResponse>> login(
+            @RequestBody Map<String, String> body,
+            HttpServletResponse httpResponse) {
         String email = body.get("email");
         String password = body.get("password");
         CustomerLoginResponse result = customerService.login(email, password);
+        // httpOnly cookie: token JS tarafından okunamaz
+        setAuthCookie(httpResponse, result.token());
         ApiResponse<CustomerLoginResponse> response = new ApiResponse<>(true, result, null);
         response.setMessage("Giriş başarılı!");
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse httpResponse) {
+        clearAuthCookie(httpResponse);
+        ApiResponse<Void> response = new ApiResponse<>();
+        response.setSuccess(true);
+        response.setMessage("Çıkış yapıldı.");
+        return ResponseEntity.ok(response);
+    }
+
+    private void setAuthCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie("access_token", token);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 gün
+        // cookie.setSecure(true); // HTTPS production'da aktif edilmeli
+        response.addCookie(cookie);
+    }
+
+    private void clearAuthCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie("access_token", "");
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
     }
 
     @GetMapping("/me")

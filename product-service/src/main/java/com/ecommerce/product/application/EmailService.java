@@ -35,6 +35,25 @@ public class EmailService {
         }
     }
 
+    public void sendContactEmail(String fromName, String fromEmail, String subject, String messageBody) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(this.fromEmail);
+            message.setTo(this.fromEmail); // İletişim formu kendi e-postamıza gelir
+            message.setReplyTo(fromEmail);
+            message.setSubject("[İletişim Formu] " + subject);
+            message.setText(
+                    "Gönderen: " + fromName + "\n" +
+                    "E-posta: " + fromEmail + "\n\n" +
+                    "Mesaj:\n" + messageBody
+            );
+            mailSender.send(message);
+            log.info("İletişim formu e-postası gönderildi. Gönderen: {}", fromEmail);
+        } catch (Exception e) {
+            log.error("İletişim formu e-postası gönderilemedi: {}", e.getMessage());
+        }
+    }
+
     public void sendInviteEmail(String toEmail, String inviteLink) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
