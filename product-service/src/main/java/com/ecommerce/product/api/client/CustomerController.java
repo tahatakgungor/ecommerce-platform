@@ -5,7 +5,7 @@ import com.ecommerce.product.dto.ApiResponse;
 import com.ecommerce.product.dto.auth.CustomerLoginResponse;
 import com.ecommerce.product.dto.auth.CustomerSignupRequest;
 import com.ecommerce.product.dto.auth.CustomerUserDto;
-import jakarta.servlet.http.Cookie;
+
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -54,20 +54,25 @@ public class CustomerController {
     }
 
     private void setAuthCookie(HttpServletResponse response, String token) {
-        Cookie cookie = new Cookie("access_token", token);
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(7 * 24 * 60 * 60); // 7 gün
-        // cookie.setSecure(true); // HTTPS production'da aktif edilmeli
-        response.addCookie(cookie);
+        org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("access_token", token)
+                .httpOnly(true)
+                .path("/")
+                .maxAge(7 * 24 * 60 * 60)
+                .sameSite("None")
+                .secure(true)
+                .build();
+        response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     private void clearAuthCookie(HttpServletResponse response) {
-        Cookie cookie = new Cookie("access_token", "");
-        cookie.setHttpOnly(true);
-        cookie.setPath("/");
-        cookie.setMaxAge(0);
-        response.addCookie(cookie);
+        org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("access_token", "")
+                .httpOnly(true)
+                .path("/")
+                .maxAge(0)
+                .sameSite("None")
+                .secure(true)
+                .build();
+        response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
     @GetMapping("/me")
