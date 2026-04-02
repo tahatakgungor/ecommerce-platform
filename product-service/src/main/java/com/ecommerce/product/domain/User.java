@@ -25,6 +25,10 @@ public class User {
     private String city;
     private String country;
     private String zipCode;
+    // JSON array olarak saklanan kayıtlı adresler
+    @Column(columnDefinition = "TEXT")
+    private String savedAddresses;
+
     private String passwordResetToken;
     private String emailVerificationToken;
 

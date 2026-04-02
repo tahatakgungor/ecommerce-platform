@@ -161,6 +161,9 @@ public class CustomerService {
         if (updates.containsKey("zipCode")) {
             user.setZipCode(updates.get("zipCode"));
         }
+        if (updates.containsKey("savedAddresses")) {
+            user.setSavedAddresses(updates.get("savedAddresses"));
+        }
         if (updates.containsKey("email") && updates.get("email") != null) {
             String newEmail = updates.get("email");
             if (!newEmail.equals(user.getEmail())) {
@@ -187,7 +190,8 @@ public class CustomerService {
                 user.getAddress(),
                 user.getCity(),
                 user.getCountry(),
-                user.getZipCode()
+                user.getZipCode(),
+                user.getSavedAddresses()
         );
     }
 }

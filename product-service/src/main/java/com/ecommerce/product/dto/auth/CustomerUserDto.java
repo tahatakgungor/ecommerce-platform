@@ -11,5 +11,6 @@ public record CustomerUserDto(
         String address,
         String city,
         String country,
-        String zipCode
+        String zipCode,
+        String savedAddresses
 ) {}
