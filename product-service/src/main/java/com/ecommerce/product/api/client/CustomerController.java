@@ -82,10 +82,14 @@ public class CustomerController {
     }
 
     @GetMapping("/confirmEmail/{token}")
-    public ResponseEntity<ApiResponse<String>> confirmEmail(@PathVariable String token) {
-        // Email doğrulama sistemi henüz uygulanmadı; başarılı döner
-        ApiResponse<String> response = new ApiResponse<>(true, null, null);
-        response.setMessage("Email confirmed.");
+    public ResponseEntity<ApiResponse<CustomerLoginResponse>> confirmEmail(
+            @PathVariable String token,
+            HttpServletResponse httpResponse) {
+        CustomerLoginResponse result = customerService.confirmEmail(token);
+        // Standart access_token cookie'sini set et (JwtAuthenticationFilter ile uyumlu)
+        setAuthCookie(httpResponse, result.token());
+        ApiResponse<CustomerLoginResponse> response = new ApiResponse<>(true, result, null);
+        response.setMessage("E-posta adresiniz doğrulandı. Giriş yapılıyor...");
         return ResponseEntity.ok(response);
     }
 

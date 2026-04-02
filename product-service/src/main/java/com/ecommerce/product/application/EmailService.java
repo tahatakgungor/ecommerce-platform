@@ -17,6 +17,25 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    public void sendVerificationEmail(String toEmail, String verificationLink) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(toEmail);
+            message.setSubject("E-posta Adresinizi Doğrulayın - SERRAVİT");
+            message.setText("Merhaba,\n\n" +
+                    "Hesabınızı aktif hale getirmek için aşağıdaki bağlantıya tıklayın:\n\n" +
+                    verificationLink + "\n\n" +
+                    "Bu bağlantı 24 saat geçerlidir.\n" +
+                    "Eğer bu isteği siz yapmadıysanız bu e-postayı görmezden gelin.\n\n" +
+                    "SERRAVİT Ekibi");
+            mailSender.send(message);
+            log.info("Doğrulama e-postası gönderildi: {}", toEmail);
+        } catch (Exception e) {
+            log.error("Doğrulama e-postası gönderilemedi: {}", e.getMessage());
+        }
+    }
+
     public void sendPasswordResetEmail(String toEmail, String resetToken) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();

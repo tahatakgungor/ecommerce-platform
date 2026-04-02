@@ -10,6 +10,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.beans.factory.annotation.Value;
 import java.util.Map;
 import java.util.UUID;
 
@@ -21,6 +22,9 @@ public class CustomerService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     @Transactional
     public CustomerLoginResponse signup(CustomerSignupRequest request) {
@@ -42,10 +46,16 @@ public class CustomerService {
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole("Customer");
+        user.setEmailVerified(false);
+        String verificationToken = UUID.randomUUID().toString().replace("-", "");
+        user.setEmailVerificationToken(verificationToken);
         userRepository.save(user);
 
-        String token = jwtService.generateToken(user.getEmail(), user.getRole());
-        return new CustomerLoginResponse(token, toDto(user));
+        String verificationLink = frontendUrl + "/email-verify/" + verificationToken;
+        emailService.sendVerificationEmail(user.getEmail(), verificationLink);
+
+        // Kullanıcı kayıt oldu ama henüz doğrulamadı — token döndürmüyoruz
+        return new CustomerLoginResponse(null, toDto(user));
     }
 
     public CustomerLoginResponse login(String email, String password) {
@@ -56,8 +66,27 @@ public class CustomerService {
             throw new RuntimeException("E-posta veya şifre hatalı!");
         }
 
+        // Sadece yeni kayıt akışından geçen (emailVerificationToken set edilmiş) kullanıcıları engelle.
+        // Eski (migration öncesi) kullanıcıların emailVerificationToken'ı null — onları geç.
+        if (!user.isEmailVerified() && user.getEmailVerificationToken() != null) {
+            throw new RuntimeException("Lütfen önce e-posta adresinizi doğrulayın. Gelen kutunuzu kontrol edin.");
+        }
+
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
         return new CustomerLoginResponse(token, toDto(user));
+    }
+
+    @Transactional
+    public CustomerLoginResponse confirmEmail(String token) {
+        User user = userRepository.findByEmailVerificationToken(token)
+                .orElseThrow(() -> new RuntimeException("Geçersiz veya süresi dolmuş doğrulama bağlantısı!"));
+
+        user.setEmailVerified(true);
+        user.setEmailVerificationToken(null);
+        userRepository.save(user);
+
+        String jwtToken = jwtService.generateToken(user.getEmail(), user.getRole());
+        return new CustomerLoginResponse(jwtToken, toDto(user));
     }
 
     public CustomerUserDto getMe(String email) {
@@ -120,6 +149,18 @@ public class CustomerService {
         if (updates.containsKey("phone")) {
             user.setPhone(updates.get("phone"));
         }
+        if (updates.containsKey("address")) {
+            user.setAddress(updates.get("address"));
+        }
+        if (updates.containsKey("city")) {
+            user.setCity(updates.get("city"));
+        }
+        if (updates.containsKey("country")) {
+            user.setCountry(updates.get("country"));
+        }
+        if (updates.containsKey("zipCode")) {
+            user.setZipCode(updates.get("zipCode"));
+        }
         if (updates.containsKey("email") && updates.get("email") != null) {
             String newEmail = updates.get("email");
             if (!newEmail.equals(user.getEmail())) {
@@ -142,7 +183,11 @@ public class CustomerService {
                 user.getName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getPhone()
+                user.getPhone(),
+                user.getAddress(),
+                user.getCity(),
+                user.getCountry(),
+                user.getZipCode()
         );
     }
 }

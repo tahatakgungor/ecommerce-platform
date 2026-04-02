@@ -7,5 +7,9 @@ public record CustomerUserDto(
         String name,
         String email,
         String role,
-        String phone
+        String phone,
+        String address,
+        String city,
+        String country,
+        String zipCode
 ) {}
