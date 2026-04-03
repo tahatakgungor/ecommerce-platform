@@ -31,6 +31,11 @@ public class AuthService {
             throw new RuntimeException("E-posta veya şifre hatalı!");
         }
 
+        // Müşteri hesabıyla admin panele giriş engellenir
+        if ("Customer".equalsIgnoreCase(user.getRole())) {
+            throw new RuntimeException("Bu hesap admin panele erişim yetkisine sahip değil.");
+        }
+
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
 
         return new LoginResponse(
@@ -58,7 +63,11 @@ public class AuthService {
     }
 
     public List<User> getAllUsers() {
-        return userRepository.findAll();
+        return userRepository.findByRoleIn(List.of("Admin", "Staff"));
+    }
+
+    public List<User> getAllCustomers() {
+        return userRepository.findByRole("Customer");
     }
 
     public User getUserById(UUID id) {

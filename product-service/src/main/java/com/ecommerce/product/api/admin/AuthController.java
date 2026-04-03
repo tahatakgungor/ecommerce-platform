@@ -57,6 +57,14 @@ public class AuthController {
         return ApiResponse.ok(authService.getUserById(id), 1L);
     }
 
+    // --- MÜŞTERİ LİSTELEME ---
+
+    @GetMapping("/customers")
+    public ApiResponse<?> getAllCustomers() {
+        var customers = authService.getAllCustomers();
+        return ApiResponse.ok(customers, (long) customers.size());
+    }
+
     // --- YETKİ GEREKTİREN İŞLEMLER (Sadece "Admin") ---
 
     @DeleteMapping("/{id}")
