@@ -3,6 +3,7 @@ package com.ecommerce.product.domain;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
@@ -54,7 +55,7 @@ public class Order {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneId.of("Europe/Istanbul"));
         if (this.invoice == null) {
             this.invoice = "INV-" + System.currentTimeMillis();
         }

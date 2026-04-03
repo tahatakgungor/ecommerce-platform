@@ -197,7 +197,7 @@ public class OrderService {
     // ---------- Dashboard: özet kartlar ----------
 
     public Map<String, Object> getDashboardAmount() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(java.time.ZoneId.of("Europe/Istanbul"));
         LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
         LocalDateTime todayEnd = todayStart.plusDays(1);
         LocalDateTime yesterdayStart = todayStart.minusDays(1);
@@ -249,7 +249,7 @@ public class OrderService {
     // ---------- Dashboard: satış raporu (son 30 gün) ----------
 
     public Map<String, Object> getSalesReport() {
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now(java.time.ZoneId.of("Europe/Istanbul")).minusDays(30);
         List<Order> orders = orderRepository.findByCreatedAtAfter(thirtyDaysAgo);
 
         Map<String, List<Order>> byDate = orders.stream()
