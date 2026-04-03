@@ -1,9 +1,11 @@
 package com.ecommerce.product.application;
 
+import com.ecommerce.product.domain.NewsletterEmail;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.dto.auth.CustomerLoginResponse;
 import com.ecommerce.product.dto.auth.CustomerSignupRequest;
 import com.ecommerce.product.dto.auth.CustomerUserDto;
+import com.ecommerce.product.repository.NewsletterRepository;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -19,6 +21,7 @@ import java.util.UUID;
 public class CustomerService {
 
     private final UserRepository userRepository;
+    private final NewsletterRepository newsletterRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
@@ -178,6 +181,19 @@ public class CustomerService {
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
         return new CustomerLoginResponse(token, toDto(user));
+    }
+
+    @Transactional
+    public void subscribeNewsletter(String email) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("E-posta adresi boş olamaz!");
+        }
+        if (newsletterRepository.findByEmail(email).isPresent()) {
+            throw new RuntimeException("Bu e-posta adresi zaten abone!");
+        }
+        NewsletterEmail sub = new NewsletterEmail();
+        sub.setEmail(email);
+        newsletterRepository.save(sub);
     }
 
     private CustomerUserDto toDto(User user) {

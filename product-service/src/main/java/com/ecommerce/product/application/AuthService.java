@@ -6,6 +6,7 @@ import com.ecommerce.product.dto.auth.LoginResponse;
 import com.ecommerce.product.dto.auth.RegisterRequest;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -22,6 +23,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailService emailService;
+
+    @Value("${app.frontend-url:http://localhost:3001}")
+    private String adminFrontendUrl;
 
     public LoginResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
@@ -60,6 +65,36 @@ public class AuthService {
         newUser.setRole(role != null ? role : "Staff");
 
         userRepository.save(newUser);
+    }
+
+    @Transactional
+    public void forgetPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Bu e-posta adresine kayıtlı admin hesabı bulunamadı!"));
+
+        if ("Customer".equalsIgnoreCase(user.getRole())) {
+            throw new RuntimeException("Bu hesap admin paneline ait değil.");
+        }
+
+        String resetToken = UUID.randomUUID().toString().replace("-", "");
+        user.setPasswordResetToken(resetToken);
+        userRepository.save(user);
+
+        try {
+            emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
+        } catch (Exception e) {
+            // Mail gönderilemese bile token kaydedildi
+        }
+    }
+
+    @Transactional
+    public void confirmForgetPassword(String token, String password) {
+        User user = userRepository.findByPasswordResetToken(token)
+                .orElseThrow(() -> new RuntimeException("Geçersiz veya süresi dolmuş sıfırlama bağlantısı!"));
+
+        user.setPassword(passwordEncoder.encode(password));
+        user.setPasswordResetToken(null);
+        userRepository.save(user);
     }
 
     public List<User> getAllUsers() {

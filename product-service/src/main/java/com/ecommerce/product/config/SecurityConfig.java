@@ -34,6 +34,8 @@ public class SecurityConfig {
                         // Admin auth endpoint'leri
                         .requestMatchers("/api/admin/login").permitAll()
                         .requestMatchers("/api/admin/register").permitAll()
+                        .requestMatchers("/api/admin/forget-password").permitAll()
+                        .requestMatchers("/api/admin/confirm-forget-password").permitAll()
                         // Müşteri auth endpoint'leri
                         .requestMatchers("/api/user/signup").permitAll()
                         .requestMatchers("/api/user/login").permitAll()
@@ -53,6 +55,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/order/create-payment-intent").permitAll()
                         // İletişim formu - public
                         .requestMatchers("/api/contact/send").permitAll()
+                        // Newsletter - giriş yapmadan abone olunabilir
+                        .requestMatchers("/api/user/newsletter").permitAll()
                         // Logout - herkes erişebilir (cookie temizleme)
                         .requestMatchers("/api/user/logout").permitAll()
                         // Static dosyalar

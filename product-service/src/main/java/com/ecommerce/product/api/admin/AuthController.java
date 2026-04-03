@@ -25,7 +25,19 @@ public class AuthController {
     private final InvitationService invitationService;
     private final EmailService emailService;
 
-    // --- GİRİŞ VE KAYIT ---
+    // --- GİRİŞ, KAYIT VE ŞİFRE SIFIRLAMA ---
+
+    @PatchMapping("/forget-password")
+    public ApiResponse<String> forgetPassword(@RequestBody Map<String, String> request) {
+        authService.forgetPassword(request.get("email"));
+        return ApiResponse.ok("Şifre sıfırlama talimatları e-posta adresinize gönderildi.", 1L);
+    }
+
+    @PatchMapping("/confirm-forget-password")
+    public ApiResponse<String> confirmForgetPassword(@RequestBody Map<String, String> request) {
+        authService.confirmForgetPassword(request.get("token"), request.get("password"));
+        return ApiResponse.ok("Şifreniz başarıyla güncellendi.", 1L);
+    }
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {

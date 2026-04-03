@@ -136,4 +136,13 @@ public class CustomerController {
         response.setMessage("Profil güncellendi.");
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/newsletter")
+    public ResponseEntity<ApiResponse<String>> subscribeNewsletter(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        customerService.subscribeNewsletter(email);
+        ApiResponse<String> response = new ApiResponse<>(true, null, null);
+        response.setMessage("Bültenimize başarıyla abone oldunuz!");
+        return ResponseEntity.ok(response);
+    }
 }
