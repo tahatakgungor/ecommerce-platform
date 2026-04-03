@@ -134,6 +134,7 @@ public class ProductController {
         product.setCategoryName(extractString(request.getCategory()));
         product.setBrandName(extractString(request.getBrand()));
         product.setImage(extractString(request.getImage()));
+        if (request.getStatus() != null) product.setStatus(request.getStatus());
 
         return product;
     }
