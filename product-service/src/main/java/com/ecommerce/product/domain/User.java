@@ -2,6 +2,7 @@ package com.ecommerce.product.domain;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -32,6 +33,7 @@ public class User {
     private String savedAddresses;
 
     private String passwordResetToken;
+    private LocalDateTime passwordResetTokenExpiresAt;
     private String emailVerificationToken;
 
     // Mevcut kullanıcılar için DB default false — NULL'dan korunmak için columnDefinition

@@ -13,7 +13,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.beans.factory.annotation.Value;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -83,7 +88,8 @@ public class CustomerService {
     }
 
     public CustomerLoginResponse login(String email, String password) {
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new RuntimeException("E-posta veya şifre hatalı!"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
@@ -121,15 +127,21 @@ public class CustomerService {
 
     @Transactional
     public void forgetPassword(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Bu email adresine kayıtlı hesap bulunamadı!"));
+        String normalizedEmail = normalizeEmail(email);
+        Optional<User> optionalUser = userRepository.findByEmail(normalizedEmail);
+        if (optionalUser.isEmpty() || !"Customer".equalsIgnoreCase(optionalUser.get().getRole())) {
+            // Hesap var/yok bilgisini ifşa etmemek için sessizce dön.
+            return;
+        }
+        User user = optionalUser.get();
 
-        String resetToken = UUID.randomUUID().toString().replace("-", "");
-        user.setPasswordResetToken(resetToken);
+        String rawResetToken = UUID.randomUUID().toString().replace("-", "");
+        user.setPasswordResetToken(hashToken(rawResetToken));
+        user.setPasswordResetTokenExpiresAt(LocalDateTime.now().plusMinutes(30));
         userRepository.save(user);
 
         try {
-            emailService.sendPasswordResetEmail(user.getEmail(), resetToken);
+            emailService.sendPasswordResetEmail(user.getEmail(), rawResetToken);
         } catch (Exception ignored) {
             // Mail gönderilemese bile token kaydedildi; production'da loglanmalı
         }
@@ -137,15 +149,27 @@ public class CustomerService {
 
     @Transactional
     public void confirmForgetPassword(String token, String newPassword, String confirmPassword) {
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 6) {
+            throw new RuntimeException("Yeni şifre en az 6 karakter olmalıdır!");
+        }
         if (!newPassword.equals(confirmPassword)) {
             throw new RuntimeException("Şifreler eşleşmiyor!");
         }
 
-        User user = userRepository.findByPasswordResetToken(token)
+        User user = userRepository.findByPasswordResetToken(hashToken(token))
+                .or(() -> userRepository.findByPasswordResetToken(token))
                 .orElseThrow(() -> new RuntimeException("Geçersiz veya süresi dolmuş sıfırlama bağlantısı!"));
+
+        if (user.getPasswordResetTokenExpiresAt() == null || user.getPasswordResetTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            user.setPasswordResetToken(null);
+            user.setPasswordResetTokenExpiresAt(null);
+            userRepository.save(user);
+            throw new RuntimeException("Sıfırlama bağlantısının süresi doldu. Lütfen yeniden talep oluşturun.");
+        }
 
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiresAt(null);
         userRepository.save(user);
     }
 
@@ -230,5 +254,24 @@ public class CustomerService {
                 user.getZipCode(),
                 user.getSavedAddresses()
         );
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
+    private String hashToken(String token) {
+        if (token == null || token.isBlank()) return "";
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Token hash algoritması bulunamadı", e);
+        }
     }
 }

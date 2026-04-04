@@ -59,39 +59,43 @@ public class CustomerController {
             throw ex;
         }
         // httpOnly cookie: token JS tarafından okunamaz
-        setAuthCookie(httpResponse, result.token());
+        setAuthCookie(httpResponse, result.token(), isHttpsRequest(httpRequest));
         ApiResponse<CustomerLoginResponse> response = new ApiResponse<>(true, result, null);
         response.setMessage("Giriş başarılı!");
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout(HttpServletResponse httpResponse) {
-        clearAuthCookie(httpResponse);
+    public ResponseEntity<ApiResponse<Void>> logout(
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        clearAuthCookie(httpResponse, isHttpsRequest(httpRequest));
         ApiResponse<Void> response = new ApiResponse<>();
         response.setSuccess(true);
         response.setMessage("Çıkış yapıldı.");
         return ResponseEntity.ok(response);
     }
 
-    private void setAuthCookie(HttpServletResponse response, String token) {
+    private void setAuthCookie(HttpServletResponse response, String token, boolean secureCookie) {
+        String sameSite = secureCookie ? "None" : "Lax";
         org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("access_token", token)
                 .httpOnly(true)
                 .path("/")
                 .maxAge(7 * 24 * 60 * 60)
-                .sameSite("None")
-                .secure(true)
+                .sameSite(sameSite)
+                .secure(secureCookie)
                 .build();
         response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
     }
 
-    private void clearAuthCookie(HttpServletResponse response) {
+    private void clearAuthCookie(HttpServletResponse response, boolean secureCookie) {
+        String sameSite = secureCookie ? "None" : "Lax";
         org.springframework.http.ResponseCookie cookie = org.springframework.http.ResponseCookie.from("access_token", "")
                 .httpOnly(true)
                 .path("/")
                 .maxAge(0)
-                .sameSite("None")
-                .secure(true)
+                .sameSite(sameSite)
+                .secure(secureCookie)
                 .build();
         response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, cookie.toString());
     }
@@ -105,10 +109,11 @@ public class CustomerController {
     @GetMapping("/confirmEmail/{token}")
     public ResponseEntity<ApiResponse<CustomerLoginResponse>> confirmEmail(
             @PathVariable String token,
+            HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         CustomerLoginResponse result = customerService.confirmEmail(token);
         // Standart access_token cookie'sini set et (JwtAuthenticationFilter ile uyumlu)
-        setAuthCookie(httpResponse, result.token());
+        setAuthCookie(httpResponse, result.token(), isHttpsRequest(httpRequest));
         ApiResponse<CustomerLoginResponse> response = new ApiResponse<>(true, result, null);
         response.setMessage("E-posta adresiniz doğrulandı. Giriş yapılıyor...");
         return ResponseEntity.ok(response);
@@ -196,5 +201,13 @@ public class CustomerController {
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
+    }
+
+    private boolean isHttpsRequest(HttpServletRequest request) {
+        String forwardedProto = request.getHeader("X-Forwarded-Proto");
+        if (forwardedProto != null && !forwardedProto.isBlank()) {
+            return forwardedProto.split(",")[0].trim().equalsIgnoreCase("https");
+        }
+        return request.isSecure();
     }
 }

@@ -41,6 +41,8 @@ app:
       reply-to: ${RESEND_REPLY_TO:}
   stripe:
     secret-key: ${STRIPE_SECRET_KEY:}
+  security:
+    require-startup-validation: ${REQUIRE_STARTUP_VALIDATION:false}
 
 logging:
   level:
