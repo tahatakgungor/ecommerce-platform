@@ -204,6 +204,8 @@ class ProductReviewServiceTest {
         existing.setUser(user);
         existing.setRating(3);
         existing.setCommentBody("Eski yorum");
+        existing.setHelpfulCount(7L);
+        existing.setNotHelpfulCount(2L);
 
         Order deliveredOrder = new Order();
         deliveredOrder.setId(orderId);
@@ -230,6 +232,8 @@ class ProductReviewServiceTest {
         verify(orderRepository).save(any(Order.class));
         assertTrue(deliveredOrder.getReviewedProducts().contains(productId.toString()));
         assertEquals(5, existing.getRating());
+        assertEquals(0L, existing.getHelpfulCount());
+        assertEquals(0L, existing.getNotHelpfulCount());
     }
 
     @Test

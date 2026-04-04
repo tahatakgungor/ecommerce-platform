@@ -56,6 +56,8 @@ public class ProductReviewService {
         review.setStatus(resolveInitialStatus(review));
         review.setVerifiedPurchase(true);
         review.setMediaUrls(writeMediaUrls(sanitizeMediaUrls(request.getMediaUrls())));
+        review.setHelpfulCount(0L);
+        review.setNotHelpfulCount(0L);
 
         ProductReview saved = productReviewRepository.save(review);
         markProductAsReviewedForOrder(orderId, user.getId(), productId);
@@ -540,7 +542,7 @@ public class ProductReviewService {
             case "highest", "highest_rating" -> Sort.by(Sort.Order.desc("rating"), Sort.Order.desc("createdAt"));
             case "lowest", "lowest_rating" -> Sort.by(Sort.Order.asc("rating"), Sort.Order.desc("createdAt"));
             case "most_helpful" -> Sort.by(Sort.Order.desc("helpfulCount"), Sort.Order.desc("createdAt"));
-            default -> Sort.by(Sort.Order.desc("createdAt"));
+            default -> Sort.by(Sort.Order.desc("updatedAt"), Sort.Order.desc("createdAt"));
         };
     }
 
