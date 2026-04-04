@@ -41,9 +41,10 @@ public class ProductReviewController {
     @GetMapping("/eligibility")
     public ResponseEntity<ApiResponse<ReviewEligibilityResponse>> getReviewEligibility(
             @PathVariable UUID productId,
+            @RequestParam(required = false) UUID orderId,
             Authentication authentication
     ) {
-        ReviewEligibilityResponse response = productReviewService.getReviewEligibility(productId, authentication.getName());
+        ReviewEligibilityResponse response = productReviewService.getReviewEligibility(productId, orderId, authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(response, 1L));
     }
 

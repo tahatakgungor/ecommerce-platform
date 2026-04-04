@@ -195,6 +195,7 @@ public class OrderService {
         map.put("couponTitle", o.getCouponTitle());
         map.put("createdAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
         map.put("cart", fromJson(o.getCart()));
+        map.put("reviewedProducts", fromJson(o.getReviewedProducts()));
         map.put("cardInfo", fromJson(o.getCardInfo()));
         map.put("paymentIntent", fromJson(o.getPaymentIntent()));
         return map;

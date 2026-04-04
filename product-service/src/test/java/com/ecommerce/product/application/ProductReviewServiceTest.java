@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -187,6 +188,48 @@ class ProductReviewServiceTest {
         assertTrue(saved.isVerifiedPurchase());
         assertEquals(ReviewStatus.PENDING, saved.getStatus());
         assertEquals(4, saved.getRating());
+    }
+
+    @Test
+    void createReview_shouldAllowNewOrderAndMarkReviewedProductsWhenOrderIdProvided() {
+        UUID productId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+        Product product = new Product();
+        product.setId(productId);
+
+        ProductReview existing = new ProductReview();
+        existing.setId(UUID.randomUUID());
+        existing.setProduct(product);
+        existing.setUser(user);
+        existing.setRating(3);
+        existing.setCommentBody("Eski yorum");
+
+        Order deliveredOrder = new Order();
+        deliveredOrder.setId(orderId);
+        deliveredOrder.setUserId(user.getId().toString());
+        deliveredOrder.setStatus("delivered");
+        deliveredOrder.setCart("[{\"_id\":\"" + productId + "\",\"orderQuantity\":1}]");
+        deliveredOrder.setReviewedProducts("[]");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(deliveredOrder));
+        when(productReviewRepository.findByProductIdAndUserId(productId, user.getId())).thenReturn(Optional.of(existing));
+        when(productReviewRepository.save(any(ProductReview.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ReviewCreateRequest request = new ReviewCreateRequest();
+        request.setOrderId(orderId);
+        request.setRating(5);
+        request.setCommentBody("Yeni sipariş için tekrar yorum.");
+
+        ReviewResponse response = productReviewService.createReview(productId, request, "customer@example.com");
+
+        assertNotNull(response);
+        verify(orderRepository).save(any(Order.class));
+        assertTrue(deliveredOrder.getReviewedProducts().contains(productId.toString()));
+        assertEquals(5, existing.getRating());
     }
 
     @Test
@@ -392,6 +435,30 @@ class ProductReviewServiceTest {
 
         assertTrue(eligibility.isCanReview());
         assertEquals(null, eligibility.getReason());
+    }
+
+    @Test
+    void getReviewEligibility_shouldBeOrderScopedWhenOrderIdProvided() {
+        UUID productId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+
+        Order deliveredOrder = new Order();
+        deliveredOrder.setId(orderId);
+        deliveredOrder.setUserId(user.getId().toString());
+        deliveredOrder.setStatus("delivered");
+        deliveredOrder.setCart("[{\"_id\":\"" + productId + "\",\"orderQuantity\":1}]");
+        deliveredOrder.setReviewedProducts("[]");
+
+        when(productRepository.existsById(productId)).thenReturn(true);
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(orderRepository.findById(orderId)).thenReturn(Optional.of(deliveredOrder));
+
+        var eligibility = productReviewService.getReviewEligibility(productId, orderId, "customer@example.com");
+
+        assertTrue(eligibility.isCanReview());
+        assertTrue(eligibility.isDeliveredPurchase());
+        assertFalse(eligibility.isAlreadyReviewed());
     }
 
     @Test

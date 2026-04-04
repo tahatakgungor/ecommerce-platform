@@ -40,12 +40,14 @@ public class ProductReviewService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
-        ReviewEligibilityResponse eligibility = evaluateEligibility(productId, user);
+        UUID orderId = request.getOrderId();
+        ReviewEligibilityResponse eligibility = evaluateEligibility(productId, orderId, user);
         if (!eligibility.isCanReview()) {
             throw new RuntimeException(eligibility.getReason());
         }
 
-        ProductReview review = new ProductReview();
+        Optional<ProductReview> existingReview = productReviewRepository.findByProductIdAndUserId(productId, user.getId());
+        ProductReview review = existingReview.orElseGet(ProductReview::new);
         review.setProduct(product);
         review.setUser(user);
         review.setRating(request.getRating());
@@ -56,17 +58,23 @@ public class ProductReviewService {
         review.setMediaUrls(writeMediaUrls(sanitizeMediaUrls(request.getMediaUrls())));
 
         ProductReview saved = productReviewRepository.save(review);
+        markProductAsReviewedForOrder(orderId, user.getId(), productId);
         return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
     public ReviewEligibilityResponse getReviewEligibility(UUID productId, String userEmail) {
+        return getReviewEligibility(productId, null, userEmail);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewEligibilityResponse getReviewEligibility(UUID productId, UUID orderId, String userEmail) {
         ensureProductExists(productId);
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
-        return evaluateEligibility(productId, user);
+        return evaluateEligibility(productId, orderId, user);
     }
 
     @Transactional
@@ -311,7 +319,69 @@ public class ProductReviewService {
                 .anyMatch(productId::equals);
     }
 
-    private ReviewEligibilityResponse evaluateEligibility(UUID productId, User user) {
+    private Optional<Order> resolveEligibleOrder(UUID userId, UUID orderId, UUID productId) {
+        if (orderId != null) {
+            return orderRepository.findById(orderId)
+                    .filter(order -> userId.toString().equals(order.getUserId()))
+                    .filter(order -> "delivered".equalsIgnoreCase(trimNullable(order.getStatus())))
+                    .filter(order -> cartContainsProduct(order, productId));
+        }
+
+        return orderRepository.findByUserIdOrderByCreatedAtDesc(userId.toString())
+                .stream()
+                .filter(order -> "delivered".equalsIgnoreCase(trimNullable(order.getStatus())))
+                .filter(order -> cartContainsProduct(order, productId))
+                .findFirst();
+    }
+
+    private boolean cartContainsProduct(Order order, UUID productId) {
+        if (order == null || productId == null) return false;
+        return parseCartItems(order.getCart())
+                .stream()
+                .map(this::extractProductIdFromCartItem)
+                .anyMatch(productId::equals);
+    }
+
+    private Set<UUID> parseReviewedProductIds(Order order) {
+        if (order == null) return Set.of();
+        String json = order.getReviewedProducts();
+        if (json == null || json.isBlank()) return Set.of();
+        try {
+            List<String> list = objectMapper.readValue(json, new TypeReference<List<String>>() {});
+            Set<UUID> ids = new LinkedHashSet<>();
+            for (String item : list) {
+                try {
+                    ids.add(UUID.fromString(item));
+                } catch (Exception ignored) {
+                }
+            }
+            return ids;
+        } catch (Exception ex) {
+            return Set.of();
+        }
+    }
+
+    private void markProductAsReviewedForOrder(UUID orderId, UUID userId, UUID productId) {
+        if (orderId == null || userId == null || productId == null) return;
+
+        Order order = orderRepository.findById(orderId)
+                .filter(found -> userId.toString().equals(found.getUserId()))
+                .orElse(null);
+        if (order == null) return;
+
+        Set<UUID> reviewed = new LinkedHashSet<>(parseReviewedProductIds(order));
+        if (reviewed.add(productId)) {
+            try {
+                List<String> serialized = reviewed.stream().map(UUID::toString).toList();
+                order.setReviewedProducts(objectMapper.writeValueAsString(serialized));
+                orderRepository.save(order);
+            } catch (Exception ignored) {
+                // İşaretleme hatası review submit akışını bozmasın.
+            }
+        }
+    }
+
+    private ReviewEligibilityResponse evaluateEligibility(UUID productId, UUID orderId, User user) {
         if (!isCustomerRole(user.getRole())) {
             return ReviewEligibilityResponse.builder()
                     .canReview(false)
@@ -321,14 +391,26 @@ public class ProductReviewService {
                     .build();
         }
 
-        boolean deliveredPurchase = hasDeliveredPurchase(user.getId(), productId);
-        boolean alreadyReviewed = productReviewRepository.findByProductIdAndUserId(productId, user.getId()).isPresent();
+        Optional<Order> eligibleOrderOpt = resolveEligibleOrder(user.getId(), orderId, productId);
+        boolean deliveredPurchase = eligibleOrderOpt.isPresent();
+
+        boolean alreadyReviewed;
+        if (orderId != null) {
+            alreadyReviewed = eligibleOrderOpt
+                    .map(this::parseReviewedProductIds)
+                    .map(ids -> ids.contains(productId))
+                    .orElse(false);
+        } else {
+            alreadyReviewed = productReviewRepository.findByProductIdAndUserId(productId, user.getId()).isPresent();
+        }
 
         String reason = null;
         if (!deliveredPurchase) {
             reason = "Yorum yapabilmek için ürün siparişinizin teslim edilmiş olması gerekir.";
         } else if (alreadyReviewed) {
-            reason = "Bu ürün için zaten bir yorumunuz var. Düzenleme yapabilirsiniz.";
+            reason = orderId != null
+                    ? "Bu siparişte bu ürün için değerlendirme zaten yapıldı."
+                    : "Bu ürün için zaten bir yorumunuz var. Düzenleme yapabilirsiniz.";
         }
 
         return ReviewEligibilityResponse.builder()

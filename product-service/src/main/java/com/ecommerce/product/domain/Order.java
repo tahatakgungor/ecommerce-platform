@@ -52,6 +52,10 @@ public class Order {
     @Column(columnDefinition = "TEXT")
     private String paymentIntent;
 
+    // Sipariş bazlı değerlendirilen ürün ID listesi (JSON array)
+    @Column(columnDefinition = "TEXT")
+    private String reviewedProducts;
+
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
