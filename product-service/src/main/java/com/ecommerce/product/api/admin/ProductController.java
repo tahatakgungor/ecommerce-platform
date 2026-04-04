@@ -7,6 +7,7 @@ import com.ecommerce.product.dto.product.ProductRequest;
 import com.ecommerce.product.dto.product.ProductResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +27,7 @@ public class ProductController {
      * Tüm ürünleri listeler (Admin Paneli Tablosu için)
      */
     @GetMapping("/all")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<List<ProductResponse>> getAllProducts() {
         List<Product> products = productService.findAll();
 
@@ -41,6 +43,7 @@ public class ProductController {
      * Yeni ürün ekler
      */
     @PostMapping("/add")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<ProductResponse> createProduct(@RequestBody ProductRequest request) {
         log.info("Yeni ürün ekleniyor: {}", request.getName());
         Product product = convertToEntity(request);
@@ -61,6 +64,7 @@ public class ProductController {
      * Mevcut ürünü günceller
      */
     @PutMapping("/update/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<ProductResponse> updateProduct(@PathVariable("id") UUID id, @RequestBody ProductRequest request) {
         Product product = convertToEntity(request);
         Product updated = productService.update(id, product);
@@ -71,6 +75,7 @@ public class ProductController {
      * Ürünü siler
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<String> deleteProduct(@PathVariable("id") UUID id) {
         productService.delete(id);
         return ApiResponse.ok("Ürün başarıyla silindi!", 1L);

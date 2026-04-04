@@ -51,8 +51,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/brand/all").permitAll()
                         .requestMatchers("/api/category/all").permitAll()
                         .requestMatchers("/api/coupon").permitAll()
-                        // Sipariş - payment intent public, addOrder auth gerektirir
-                        .requestMatchers("/api/order/create-payment-intent").permitAll()
                         // İletişim formu - public
                         .requestMatchers("/api/contact/send").permitAll()
                         // Newsletter - giriş yapmadan abone olunabilir

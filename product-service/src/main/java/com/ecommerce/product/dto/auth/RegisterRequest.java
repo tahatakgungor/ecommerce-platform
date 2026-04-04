@@ -7,5 +7,6 @@ public class RegisterRequest {
     private String email;
     private String password;
     private String name;
-    // getter setter
+    private String phone;
+    private String role;
 }

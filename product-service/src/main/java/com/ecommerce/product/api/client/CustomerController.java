@@ -13,7 +13,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/user")
@@ -127,11 +126,11 @@ public class CustomerController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/update-user/{id}")
+    @PutMapping("/update-user")
     public ResponseEntity<ApiResponse<CustomerLoginResponse>> updateUser(
-            @PathVariable UUID id,
-            @RequestBody Map<String, String> body) {
-        CustomerLoginResponse result = customerService.updateUser(id, body);
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        CustomerLoginResponse result = customerService.updateUser(auth.getName(), body);
         ApiResponse<CustomerLoginResponse> response = new ApiResponse<>(true, result, null);
         response.setMessage("Profil güncellendi.");
         return ResponseEntity.ok(response);

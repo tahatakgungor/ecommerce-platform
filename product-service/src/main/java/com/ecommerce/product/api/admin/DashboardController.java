@@ -3,6 +3,7 @@ package com.ecommerce.product.api.admin;
 import com.ecommerce.product.application.OrderService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -11,6 +12,7 @@ import java.util.Map;
 @RequestMapping("/api/user-order")
 @RequiredArgsConstructor
 @Slf4j
+@PreAuthorize("hasAnyAuthority('Admin','Staff')")
 public class DashboardController {
 
     private final OrderService orderService;

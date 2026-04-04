@@ -11,6 +11,7 @@ import com.ecommerce.product.dto.auth.LoginResponse;
 import com.ecommerce.product.dto.auth.RegisterRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -39,9 +40,21 @@ public class AuthController {
         return ApiResponse.ok("Şifreniz başarıyla güncellendi.", 1L);
     }
 
+    @PatchMapping("/change-password")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
+    public ApiResponse<String> changePassword(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        authService.changePassword(
+                authentication.getName(),
+                request.get("oldPass"),
+                request.get("newPass")
+        );
+        return ApiResponse.ok("Şifreniz başarıyla güncellendi.", 1L);
+    }
+
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
-        System.out.println("Giriş isteği: " + request.email());
         LoginResponse response = authService.login(request);
         return ApiResponse.ok(response, 1L);
     }
@@ -60,11 +73,13 @@ public class AuthController {
     // --- PERSONEL LİSTELEME ---
 
     @GetMapping("/all")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<?> getAllStaff() {
         return ApiResponse.ok(authService.getAllUsers(), (long) authService.getAllUsers().size());
     }
 
     @GetMapping("/get/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<User> getStaffById(@PathVariable("id") UUID id) {
         return ApiResponse.ok(authService.getUserById(id), 1L);
     }
@@ -72,6 +87,7 @@ public class AuthController {
     // --- MÜŞTERİ LİSTELEME ---
 
     @GetMapping("/customers")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<?> getAllCustomers() {
         var customers = authService.getAllCustomers();
         return ApiResponse.ok(customers, (long) customers.size());
@@ -103,6 +119,13 @@ public class AuthController {
                 "message", sendEmail ? "Davetiye e-posta ile gönderildi" : "Davetiye linki oluşturuldu",
                 "link", inviteLink
         ), 1L);
+    }
+
+    @PostMapping("/add")
+    @PreAuthorize("hasAuthority('Admin')")
+    public ApiResponse<String> addStaff(@RequestBody RegisterRequest request) {
+        authService.registerWithRole(request, request.getRole());
+        return ApiResponse.ok("Personel başarıyla eklendi.", 1L);
     }
 
     /**

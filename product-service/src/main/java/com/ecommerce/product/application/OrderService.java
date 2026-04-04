@@ -3,6 +3,7 @@ package com.ecommerce.product.application;
 import com.ecommerce.product.domain.Order;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.repository.OrderRepository;
+import com.ecommerce.product.repository.ProductRepository;
 import com.ecommerce.product.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,7 +64,9 @@ public class OrderService {
     // ---------- Sipariş kaydet ----------
 
     @Transactional
-    public Map<String, Object> addOrder(Map<String, Object> body) {
+    public Map<String, Object> addOrder(Map<String, Object> body, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
         Order order = new Order();
 
         order.setName(str(body, "name"));
@@ -75,7 +78,7 @@ public class OrderService {
         order.setZipCode(str(body, "zipCode"));
         order.setShippingOption(str(body, "shippingOption"));
         order.setStatus("pending");
-        order.setUserId(str(body, "user"));
+        order.setUserId(user.getId().toString());
 
         order.setSubTotal(toDouble(body.get("subTotal")));
         order.setShippingCost(toDouble(body.get("shippingCost")));
@@ -111,6 +114,20 @@ public class OrderService {
     public Map<String, Object> getSingleOrder(UUID id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
+        return Map.of("order", toResponse(order));
+    }
+
+    public Map<String, Object> getSingleOrderForUser(String email, UUID id) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
+
+        if (!user.getId().toString().equals(order.getUserId())) {
+            throw new RuntimeException("Bu siparişi görüntüleme yetkiniz yok!");
+        }
+
         return Map.of("order", toResponse(order));
     }
 

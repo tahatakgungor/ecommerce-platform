@@ -47,6 +47,7 @@ public class AuthService {
                 token,
                 user.getEmail(),
                 user.getName(),
+                user.getPhone(),
                 user.getRole(),
                 user.getId()
         );
@@ -62,6 +63,7 @@ public class AuthService {
         newUser.setEmail(request.getEmail());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setName(request.getName());
+        newUser.setPhone(request.getPhone());
         newUser.setRole(role != null ? role : "Staff");
 
         userRepository.save(newUser);
@@ -94,6 +96,23 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(password));
         user.setPasswordResetToken(null);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void changePassword(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new RuntimeException("Mevcut şifre hatalı!");
+        }
+
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 6) {
+            throw new RuntimeException("Yeni şifre en az 6 karakter olmalıdır!");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
 
@@ -160,6 +179,15 @@ public class AuthService {
 
         user.setName(request.getName());
         user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+
+        if (request.getRole() != null && !request.getRole().isBlank()) {
+            if ("Admin".equalsIgnoreCase(request.getRole())) {
+                user.setRole("Admin");
+            } else if ("Staff".equalsIgnoreCase(request.getRole())) {
+                user.setRole("Staff");
+            }
+        }
 
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -174,6 +202,7 @@ public class AuthService {
                 newToken,
                 user.getEmail(),
                 user.getName(),
+                user.getPhone(),
                 user.getRole(),
                 user.getId()
         );

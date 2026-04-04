@@ -5,6 +5,7 @@ import com.ecommerce.product.domain.Brand;
 import com.ecommerce.product.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,21 +26,25 @@ public class BrandController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<Brand> getBrandById(@PathVariable UUID id) {
         return ApiResponse.ok(brandService.getBrandById(id), 1L);
     }
 
     @PostMapping("/add")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<Brand> addBrand(@RequestBody Brand brand) {
         return ApiResponse.ok(brandService.createBrand(brand), 1L);
     }
 
     @PutMapping("/update/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<Brand> updateBrand(@PathVariable UUID id, @RequestBody Brand brand) {
         return ApiResponse.ok(brandService.updateBrand(id, brand), 1L);
     }
 
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<String> deleteBrand(@PathVariable UUID id) {
         log.info("Admin marka siliyor: ID {}", id); // @Slf4j eklemeyi unutma
         brandService.deleteBrand(id);

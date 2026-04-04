@@ -163,8 +163,8 @@ public class CustomerService {
     }
 
     @Transactional
-    public CustomerLoginResponse updateUser(UUID id, Map<String, String> updates) {
-        User user = userRepository.findById(id)
+    public CustomerLoginResponse updateUser(String currentUserEmail, Map<String, String> updates) {
+        User user = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
         if (updates.containsKey("name") && updates.get("name") != null) {
@@ -189,7 +189,7 @@ public class CustomerService {
             user.setSavedAddresses(updates.get("savedAddresses"));
         }
         if (updates.containsKey("email") && updates.get("email") != null) {
-            String newEmail = updates.get("email");
+            String newEmail = updates.get("email").trim().toLowerCase();
             if (!newEmail.equals(user.getEmail())) {
                 if (userRepository.findByEmail(newEmail).isPresent()) {
                     throw new RuntimeException("Bu email adresi zaten kullanımda!");

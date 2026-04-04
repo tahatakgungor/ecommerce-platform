@@ -5,6 +5,7 @@ import com.ecommerce.product.domain.Category;
 import com.ecommerce.product.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class CategoryController {
      * ID ile kategori detayını getirir
      */
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<Category> getCategoryById(@PathVariable UUID id) {
         return ApiResponse.ok(categoryService.getCategoryById(id), 1L);
     }
@@ -39,6 +41,7 @@ public class CategoryController {
      * Yeni kategori ekler
      */
     @PostMapping("/add")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<Category> addCategory(@RequestBody Category category) {
         log.info("Admin yeni kategori ekliyor: {}", category.getName());
         return ApiResponse.ok(categoryService.createCategory(category), 1L);
@@ -48,6 +51,7 @@ public class CategoryController {
      * Mevcut kategoriyi günceller
      */
     @PutMapping("/update/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<Category> updateCategory(@PathVariable UUID id, @RequestBody Category category) {
         log.info("Admin kategori güncelliyor: ID {}", id);
         return ApiResponse.ok(categoryService.updateCategory(id, category), 1L);
@@ -58,6 +62,7 @@ public class CategoryController {
      * Pom.xml'deki compiler-plugin sayesinde 'id' ismini otomatik eşleştirir.
      */
     @DeleteMapping("/delete/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<String> deleteCategory(@PathVariable UUID id) {
         log.info("Admin kategori siliyor: ID {}", id);
         categoryService.deleteCategory(id);
