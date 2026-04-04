@@ -40,25 +40,46 @@ public class CustomerService {
         if (!request.password().equals(request.confirmPassword())) {
             throw new RuntimeException("Şifreler eşleşmiyor!");
         }
-        if (userRepository.findByEmail(request.email()).isPresent()) {
-            throw new RuntimeException("Bu email adresi zaten kullanımda!");
-        }
 
-        User user = new User();
-        user.setName(request.name());
-        user.setEmail(request.email());
-        user.setPassword(passwordEncoder.encode(request.password()));
-        user.setRole("Customer");
-        user.setEmailVerified(false);
         String verificationToken = UUID.randomUUID().toString().replace("-", "");
-        user.setEmailVerificationToken(verificationToken);
-        userRepository.save(user);
+        String normalizedEmail = request.email().trim().toLowerCase();
+
+        User user = userRepository.findByEmail(normalizedEmail)
+                .map(existingUser -> refreshPendingCustomerSignup(existingUser, request, verificationToken))
+                .orElseGet(() -> createNewCustomerSignup(request, normalizedEmail, verificationToken));
 
         String verificationLink = frontendUrl + "/email-verify/" + verificationToken;
         emailService.sendVerificationEmail(user.getEmail(), verificationLink);
 
         // Kullanıcı kayıt oldu ama henüz doğrulamadı — token döndürmüyoruz
         return new CustomerLoginResponse(null, toDto(user));
+    }
+
+    private User createNewCustomerSignup(CustomerSignupRequest request, String normalizedEmail, String verificationToken) {
+        User user = new User();
+        user.setName(request.name());
+        user.setEmail(normalizedEmail);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setRole("Customer");
+        user.setEmailVerified(false);
+        user.setEmailVerificationToken(verificationToken);
+        return userRepository.save(user);
+    }
+
+    private User refreshPendingCustomerSignup(User user, CustomerSignupRequest request, String verificationToken) {
+        if (!"Customer".equalsIgnoreCase(user.getRole())) {
+            throw new RuntimeException("Bu email adresi başka bir hesap için kullanımda!");
+        }
+
+        if (user.isEmailVerified()) {
+            throw new RuntimeException("Bu email adresi zaten kullanımda!");
+        }
+
+        user.setName(request.name());
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setEmailVerificationToken(verificationToken);
+        user.setEmailVerified(false);
+        return userRepository.save(user);
     }
 
     public CustomerLoginResponse login(String email, String password) {
