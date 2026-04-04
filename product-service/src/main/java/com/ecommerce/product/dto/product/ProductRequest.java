@@ -11,6 +11,7 @@ public class ProductRequest {
 
     private String description;
     private Double price;
+    private Double originalPrice;
 
     @JsonProperty("quantity")
     private Integer stockQuantity;

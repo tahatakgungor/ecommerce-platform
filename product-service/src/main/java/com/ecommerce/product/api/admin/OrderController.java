@@ -36,8 +36,7 @@ public class OrderController {
     // Stripe: payment intent oluştur
     @PostMapping("/create-payment-intent")
     public ResponseEntity<?> createPaymentIntent(@RequestBody Map<String, Object> body) {
-        int price = Integer.parseInt(body.get("price").toString());
-        Map<String, String> result = orderService.createPaymentIntent(price);
+        Map<String, Object> result = orderService.createPaymentIntent(body);
         return ResponseEntity.ok(result);
     }
 

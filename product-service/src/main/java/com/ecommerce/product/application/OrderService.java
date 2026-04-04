@@ -1,7 +1,10 @@
 package com.ecommerce.product.application;
 
 import com.ecommerce.product.domain.Order;
+import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.domain.User;
+import com.ecommerce.product.domain.Coupon;
+import com.ecommerce.product.repository.CouponRepository;
 import com.ecommerce.product.repository.OrderRepository;
 import com.ecommerce.product.repository.ProductRepository;
 import com.ecommerce.product.repository.UserRepository;
@@ -17,7 +20,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,6 +34,8 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
+    private final CouponRepository couponRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${app.stripe.secret-key:}")
@@ -42,11 +50,13 @@ public class OrderService {
 
     // ---------- Stripe: Payment Intent ----------
 
-    public Map<String, String> createPaymentIntent(int price) {
+    public Map<String, Object> createPaymentIntent(Map<String, Object> body) {
+        CheckoutSummary checkoutSummary = calculateCheckout(body);
+        long amountInKurus = Math.round(checkoutSummary.totalAmount() * 100.0);
         try {
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
-                    .setAmount((long) price * 100L)   // dolar → sent
-                    .setCurrency("usd")
+                    .setAmount(amountInKurus)
+                    .setCurrency("try")
                     .setAutomaticPaymentMethods(
                             PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
                                     .setEnabled(true)
@@ -54,7 +64,13 @@ public class OrderService {
                     )
                     .build();
             PaymentIntent intent = PaymentIntent.create(params);
-            return Map.of("clientSecret", intent.getClientSecret());
+            return Map.of(
+                    "clientSecret", intent.getClientSecret(),
+                    "subTotal", formatAmount(checkoutSummary.subTotal()),
+                    "shippingCost", formatAmount(checkoutSummary.shippingCost()),
+                    "discount", formatAmount(checkoutSummary.discountAmount()),
+                    "totalAmount", formatAmount(checkoutSummary.totalAmount())
+            );
         } catch (Exception e) {
             log.error("Stripe PaymentIntent oluşturulamadı: {}", e.getMessage());
             throw new RuntimeException("Ödeme başlatılamadı: " + e.getMessage());
@@ -67,6 +83,7 @@ public class OrderService {
     public Map<String, Object> addOrder(Map<String, Object> body, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+        CheckoutSummary checkoutSummary = calculateCheckout(body);
         Order order = new Order();
 
         order.setName(str(body, "name"));
@@ -80,13 +97,13 @@ public class OrderService {
         order.setStatus("pending");
         order.setUserId(user.getId().toString());
 
-        order.setSubTotal(toDouble(body.get("subTotal")));
-        order.setShippingCost(toDouble(body.get("shippingCost")));
-        order.setDiscount(toDouble(body.get("discount")));
-        order.setTotalAmount(toDouble(body.get("totalAmount")));
+        order.setSubTotal(checkoutSummary.subTotal());
+        order.setShippingCost(checkoutSummary.shippingCost());
+        order.setDiscount(checkoutSummary.discountAmount());
+        order.setTotalAmount(checkoutSummary.totalAmount());
 
         // Cart, cardInfo, paymentIntent → JSON string olarak sakla
-        order.setCart(toJson(body.get("cart")));
+        order.setCart(toJson(checkoutSummary.sanitizedCart()));
         order.setCardInfo(toJson(body.get("cardInfo")));
         order.setPaymentIntent(toJson(body.get("paymentIntent")));
 
@@ -210,6 +227,181 @@ public class OrderService {
             return 0.0;
         }
     }
+
+    private CheckoutSummary calculateCheckout(Map<String, Object> body) {
+        List<Map<String, Object>> cartItems = extractCartItems(body.get("cart"));
+        if (cartItems.isEmpty()) {
+            throw new RuntimeException("Sepet boş olamaz!");
+        }
+
+        List<Map<String, Object>> sanitizedCart = new ArrayList<>();
+        double subTotal = 0.0;
+        double couponEligibleTotal = 0.0;
+        String couponProductType = null;
+        String couponCode = str(body, "couponCode");
+
+        Coupon coupon = resolveCoupon(couponCode);
+        if (coupon != null) {
+            couponProductType = normalizeText(coupon.getProductType());
+        }
+
+        for (Map<String, Object> item : cartItems) {
+            UUID productId = parseUuid(item.get("_id"), item.get("id"));
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new RuntimeException("Ürün bulunamadı: " + productId));
+
+            int quantity = parseQuantity(item.get("orderQuantity"));
+            int stockQuantity = product.getStockQuantity() != null ? product.getStockQuantity() : 0;
+            if (quantity > stockQuantity) {
+                throw new RuntimeException(product.getName() + " için yeterli stok yok.");
+            }
+
+            double price = product.getPrice() != null ? product.getPrice() : 0.0;
+            double originalPrice = product.getOriginalPrice() != null ? product.getOriginalPrice() : price;
+            int lineDiscount = 0;
+            if (originalPrice > price && originalPrice > 0) {
+                lineDiscount = (int) Math.round((1 - price / originalPrice) * 100);
+            }
+
+            double lineTotal = price * quantity;
+            subTotal += lineTotal;
+
+            if (coupon != null && matchesCouponProductType(couponProductType, product)) {
+                couponEligibleTotal += lineTotal;
+            }
+
+            Map<String, Object> sanitized = new LinkedHashMap<>();
+            sanitized.put("_id", product.getId().toString());
+            sanitized.put("title", product.getName());
+            sanitized.put("price", formatAmount(price));
+            sanitized.put("originalPrice", formatAmount(originalPrice));
+            sanitized.put("discount", lineDiscount);
+            sanitized.put("orderQuantity", quantity);
+            sanitized.put("image", product.getImage());
+            sanitized.put("parent", product.getParentCategory());
+            sanitized.put("category", Map.of("name", product.getCategoryName() != null ? product.getCategoryName() : ""));
+            sanitized.put("brand", Map.of("name", product.getBrandName() != null ? product.getBrandName() : ""));
+            sanitized.put("sku", product.getSku());
+            sanitizedCart.add(sanitized);
+        }
+
+        double shippingCost = Math.max(0.0, toDouble(body.get("shippingCost")));
+        double discountAmount = 0.0;
+
+        if (coupon != null) {
+            if (isCouponExpired(coupon.getEndTime())) {
+                throw new RuntimeException("Kuponun süresi dolmuş.");
+            }
+            if (subTotal < coupon.getMinimumAmount()) {
+                throw new RuntimeException("Kupon için minimum sepet tutarı sağlanmadı.");
+            }
+            if (couponEligibleTotal <= 0.0) {
+                throw new RuntimeException("Kupon sepetteki ürünlere uygulanamıyor.");
+            }
+            discountAmount = couponEligibleTotal * (coupon.getDiscountPercentage() / 100.0);
+        }
+
+        double totalAmount = Math.max(0.0, subTotal + shippingCost - discountAmount);
+        return new CheckoutSummary(
+                formatAmount(subTotal),
+                formatAmount(shippingCost),
+                formatAmount(discountAmount),
+                formatAmount(totalAmount),
+                sanitizedCart
+        );
+    }
+
+    private Coupon resolveCoupon(String couponCode) {
+        if (couponCode == null || couponCode.isBlank()) {
+            return null;
+        }
+
+        return couponRepository.findAll().stream()
+                .filter(coupon -> coupon.getCouponCode() != null)
+                .filter(coupon -> coupon.getCouponCode().equalsIgnoreCase(couponCode.trim()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Geçersiz kupon kodu."));
+    }
+
+    private List<Map<String, Object>> extractCartItems(Object rawCart) {
+        if (rawCart == null) {
+            return List.of();
+        }
+        return objectMapper.convertValue(rawCart, new TypeReference<List<Map<String, Object>>>() {});
+    }
+
+    private UUID parseUuid(Object... candidates) {
+        for (Object candidate : candidates) {
+            if (candidate == null) {
+                continue;
+            }
+            try {
+                return UUID.fromString(candidate.toString());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        throw new RuntimeException("Ürün kimliği geçersiz.");
+    }
+
+    private int parseQuantity(Object rawQuantity) {
+        int quantity = 1;
+        if (rawQuantity != null) {
+            try {
+                quantity = Integer.parseInt(rawQuantity.toString());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        if (quantity <= 0) {
+            throw new RuntimeException("Ürün adedi geçersiz.");
+        }
+        return quantity;
+    }
+
+    private boolean matchesCouponProductType(String couponProductType, Product product) {
+        if (couponProductType == null || couponProductType.isBlank()) {
+            return false;
+        }
+
+        String parentCategory = normalizeText(product.getParentCategory());
+        String categoryName = normalizeText(product.getCategoryName());
+        return couponProductType.equals(parentCategory) || couponProductType.equals(categoryName);
+    }
+
+    private String normalizeText(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isCouponExpired(String rawEndTime) {
+        if (rawEndTime == null || rawEndTime.isBlank()) {
+            return false;
+        }
+
+        ZoneId zoneId = ZoneId.of("Europe/Istanbul");
+        LocalDateTime now = LocalDateTime.now(zoneId);
+        try {
+            return OffsetDateTime.parse(rawEndTime).atZoneSameInstant(zoneId).toLocalDateTime().isBefore(now);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        try {
+            return LocalDateTime.parse(rawEndTime).isBefore(now);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        return false;
+    }
+
+    private double formatAmount(double amount) {
+        return Math.round(amount * 100.0) / 100.0;
+    }
+
+    private record CheckoutSummary(
+            double subTotal,
+            double shippingCost,
+            double discountAmount,
+            double totalAmount,
+            List<Map<String, Object>> sanitizedCart
+    ) {}
 
     // ---------- Dashboard: özet kartlar ----------
 

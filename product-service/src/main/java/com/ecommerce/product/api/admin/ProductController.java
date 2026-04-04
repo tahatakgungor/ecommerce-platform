@@ -129,8 +129,10 @@ public class ProductController {
         // Fiyat Ayarı
         if (request.getPrice() != null) {
             product.setPrice(request.getPrice());
-            // Eğer indirimli fiyat mantığı yoksa originalPrice=price eşlenir
-            product.setOriginalPrice(request.getPrice());
+            double originalPrice = request.getOriginalPrice() != null && request.getOriginalPrice() > 0
+                    ? request.getOriginalPrice()
+                    : request.getPrice();
+            product.setOriginalPrice(Math.max(originalPrice, request.getPrice()));
         }
 
         // --- ESNEK VERİ AYIKLAMA (String veya Object) ---
