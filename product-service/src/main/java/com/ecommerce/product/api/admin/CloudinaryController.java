@@ -24,7 +24,7 @@ public class CloudinaryController {
         // Şimdilik Frontend'i kırmamak için sabit yapı:
         Map<String, String> response = Map.of(
                 "url", "https://placehold.co/600x400?text=Yuklenen+Resim",
-                "id", "temp_" + UUID.randomUUID().toString()
+                "id", "temp/" + UUID.randomUUID()
         );
 
         return new ApiResponse<>(true, response, 1L);
@@ -37,7 +37,7 @@ public class CloudinaryController {
         List<Map<String, String>> response = java.util.Arrays.stream(files)
                 .map(file -> Map.of(
                         "url", "https://placehold.co/600x400?text=Yuklenen+Resim",
-                        "id", "temp_" + UUID.randomUUID()
+                        "id", "temp/" + UUID.randomUUID()
                 ))
                 .toList();
 

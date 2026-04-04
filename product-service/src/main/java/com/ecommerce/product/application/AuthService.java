@@ -47,6 +47,8 @@ public class AuthService {
                 token,
                 user.getEmail(),
                 user.getName(),
+                user.getImage(),
+                user.getJoiningDate(),
                 user.getPhone(),
                 user.getRole(),
                 user.getId()
@@ -55,14 +57,17 @@ public class AuthService {
 
     @Transactional
     public void registerWithRole(RegisterRequest request, String role) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new RuntimeException("Bu email zaten kullanımda!");
         }
 
         User newUser = new User();
-        newUser.setEmail(request.getEmail());
+        newUser.setEmail(normalizedEmail);
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
         newUser.setName(request.getName());
+        newUser.setImage(request.getImage());
+        newUser.setJoiningDate(request.getJoiningDate());
         newUser.setPhone(request.getPhone());
         newUser.setRole(role != null ? role : "Staff");
 
@@ -178,7 +183,9 @@ public class AuthService {
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(request.getEmail().trim().toLowerCase());
+        user.setImage(request.getImage());
+        user.setJoiningDate(request.getJoiningDate());
         user.setPhone(request.getPhone());
 
         if (request.getRole() != null && !request.getRole().isBlank()) {
@@ -202,6 +209,8 @@ public class AuthService {
                 newToken,
                 user.getEmail(),
                 user.getName(),
+                user.getImage(),
+                user.getJoiningDate(),
                 user.getPhone(),
                 user.getRole(),
                 user.getId()

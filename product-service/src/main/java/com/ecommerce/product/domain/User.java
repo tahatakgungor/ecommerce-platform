@@ -20,6 +20,8 @@ public class User {
 
     private String name;
     private String role;
+    private String image;
+    private String joiningDate;
     private String phone;
     private String address;
     private String city;

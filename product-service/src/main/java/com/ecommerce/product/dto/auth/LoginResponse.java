@@ -7,6 +7,8 @@ public record LoginResponse(
         @JsonProperty("token") String accessToken,
         String email,
         String name,
+        String image,
+        String joiningDate,
         String phone,
         String role,
         @JsonProperty("_id") UUID id // Frontend'in beklediği _id formatı
