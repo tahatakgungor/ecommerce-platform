@@ -42,6 +42,13 @@ public class Coupon {
 
     private String status = "Active";
 
+    @Column(nullable = false)
+    private String scope = "PUBLIC";
+
+    private String assignedUserEmail;
+
+    private String assignedUserId;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

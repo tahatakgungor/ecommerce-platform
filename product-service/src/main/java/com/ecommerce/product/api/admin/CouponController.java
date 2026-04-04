@@ -6,6 +6,7 @@ import com.ecommerce.product.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,8 +21,14 @@ public class CouponController {
     private final CouponService couponService;
 
     @GetMapping
-    public ApiResponse<List<Coupon>> getAllCoupons() {
-        List<Coupon> coupons = couponService.getAllCoupons();
+    public ApiResponse<List<Coupon>> getAllCoupons(Authentication authentication) {
+        boolean isAdmin = authentication != null
+                && authentication.getAuthorities().stream().anyMatch(authority ->
+                "Admin".equals(authority.getAuthority()) || "Staff".equals(authority.getAuthority()));
+
+        List<Coupon> coupons = isAdmin
+                ? couponService.getAllCoupons()
+                : couponService.getAvailableCoupons(authentication != null ? authentication.getName() : null);
         return ApiResponse.ok(coupons, (long) coupons.size());
     }
 

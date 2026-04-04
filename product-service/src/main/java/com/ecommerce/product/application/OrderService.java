@@ -50,8 +50,8 @@ public class OrderService {
 
     // ---------- Stripe: Payment Intent ----------
 
-    public Map<String, Object> createPaymentIntent(Map<String, Object> body) {
-        CheckoutSummary checkoutSummary = calculateCheckout(body);
+    public Map<String, Object> createPaymentIntent(Map<String, Object> body, String email) {
+        CheckoutSummary checkoutSummary = calculateCheckout(body, email);
         long amountInKurus = Math.round(checkoutSummary.totalAmount() * 100.0);
         try {
             PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
@@ -83,7 +83,7 @@ public class OrderService {
     public Map<String, Object> addOrder(Map<String, Object> body, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
-        CheckoutSummary checkoutSummary = calculateCheckout(body);
+        CheckoutSummary checkoutSummary = calculateCheckout(body, email);
         Order order = new Order();
 
         order.setName(str(body, "name"));
@@ -101,6 +101,8 @@ public class OrderService {
         order.setShippingCost(checkoutSummary.shippingCost());
         order.setDiscount(checkoutSummary.discountAmount());
         order.setTotalAmount(checkoutSummary.totalAmount());
+        order.setCouponCode(checkoutSummary.couponCode());
+        order.setCouponTitle(checkoutSummary.couponTitle());
 
         // Cart, cardInfo, paymentIntent → JSON string olarak sakla
         order.setCart(toJson(checkoutSummary.sanitizedCart()));
@@ -189,6 +191,8 @@ public class OrderService {
         map.put("shippingCost", o.getShippingCost());
         map.put("discount", o.getDiscount());
         map.put("totalAmount", o.getTotalAmount());
+        map.put("couponCode", o.getCouponCode());
+        map.put("couponTitle", o.getCouponTitle());
         map.put("createdAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
         map.put("cart", fromJson(o.getCart()));
         map.put("cardInfo", fromJson(o.getCardInfo()));
@@ -228,7 +232,7 @@ public class OrderService {
         }
     }
 
-    private CheckoutSummary calculateCheckout(Map<String, Object> body) {
+    private CheckoutSummary calculateCheckout(Map<String, Object> body, String userEmail) {
         List<Map<String, Object>> cartItems = extractCartItems(body.get("cart"));
         if (cartItems.isEmpty()) {
             throw new RuntimeException("Sepet boş olamaz!");
@@ -240,7 +244,7 @@ public class OrderService {
         String couponProductType = null;
         String couponCode = str(body, "couponCode");
 
-        Coupon coupon = resolveCoupon(couponCode);
+        Coupon coupon = resolveCoupon(couponCode, userEmail);
         if (coupon != null) {
             couponProductType = normalizeText(coupon.getProductType());
         }
@@ -307,20 +311,38 @@ public class OrderService {
                 formatAmount(shippingCost),
                 formatAmount(discountAmount),
                 formatAmount(totalAmount),
-                sanitizedCart
+                sanitizedCart,
+                coupon != null ? coupon.getCouponCode() : null,
+                coupon != null ? coupon.getTitle() : null
         );
     }
 
-    private Coupon resolveCoupon(String couponCode) {
+    private Coupon resolveCoupon(String couponCode, String userEmail) {
         if (couponCode == null || couponCode.isBlank()) {
             return null;
         }
 
-        return couponRepository.findAll().stream()
-                .filter(coupon -> coupon.getCouponCode() != null)
-                .filter(coupon -> coupon.getCouponCode().equalsIgnoreCase(couponCode.trim()))
-                .findFirst()
+        Coupon coupon = couponRepository.findByCouponCodeIgnoreCase(couponCode.trim())
                 .orElseThrow(() -> new RuntimeException("Geçersiz kupon kodu."));
+
+        String scope = normalizeText(coupon.getScope());
+        String normalizedUserEmail = normalizeText(userEmail);
+        String assignedUserEmail = normalizeText(coupon.getAssignedUserEmail());
+
+        if ("user".equals(scope) && !normalizedUserEmail.equals(assignedUserEmail)) {
+            throw new RuntimeException("Bu kupon yalnızca atanmış müşteri hesabında kullanılabilir.");
+        }
+
+        String status = normalizeText(coupon.getStatus());
+        if (!status.isBlank() && !"active".equals(status)) {
+            throw new RuntimeException("Bu kupon şu anda aktif değil.");
+        }
+
+        if (isCouponNotStarted(coupon.getStartTime())) {
+            throw new RuntimeException("Bu kupon henüz kullanıma açılmadı.");
+        }
+
+        return coupon;
     }
 
     private List<Map<String, Object>> extractCartItems(Object rawCart) {
@@ -391,6 +413,26 @@ public class OrderService {
         return false;
     }
 
+    private boolean isCouponNotStarted(String rawStartTime) {
+        if (rawStartTime == null || rawStartTime.isBlank()) {
+            return false;
+        }
+
+        ZoneId zoneId = ZoneId.of("Europe/Istanbul");
+        LocalDateTime now = LocalDateTime.now(zoneId);
+        try {
+            return OffsetDateTime.parse(rawStartTime).atZoneSameInstant(zoneId).toLocalDateTime().isAfter(now);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        try {
+            return LocalDateTime.parse(rawStartTime).isAfter(now);
+        } catch (DateTimeParseException ignored) {
+        }
+
+        return false;
+    }
+
     private double formatAmount(double amount) {
         return Math.round(amount * 100.0) / 100.0;
     }
@@ -400,7 +442,9 @@ public class OrderService {
             double shippingCost,
             double discountAmount,
             double totalAmount,
-            List<Map<String, Object>> sanitizedCart
+            List<Map<String, Object>> sanitizedCart,
+            String couponCode,
+            String couponTitle
     ) {}
 
     // ---------- Dashboard: özet kartlar ----------

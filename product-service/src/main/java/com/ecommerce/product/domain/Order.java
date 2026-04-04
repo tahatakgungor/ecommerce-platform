@@ -41,6 +41,8 @@ public class Order {
     private Double shippingCost;
     private Double discount;
     private Double totalAmount;
+    private String couponCode;
+    private String couponTitle;
 
     // Stripe PaymentMethod JSON
     @Column(columnDefinition = "TEXT")
