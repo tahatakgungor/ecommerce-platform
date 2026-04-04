@@ -272,7 +272,7 @@ public class ProductReviewService {
                 .reviewId(r.getId())
                 .productId(r.getProduct().getId())
                 .userId(r.getUser().getId())
-                .userName(r.getUser().getName())
+                .userName(maskDisplayName(r.getUser().getName()))
                 .rating(r.getRating())
                 .commentTitle(r.getCommentTitle())
                 .commentBody(r.getCommentBody())
@@ -284,6 +284,20 @@ public class ProductReviewService {
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())
                 .build();
+    }
+
+    private String maskDisplayName(String name) {
+        String value = trimNullable(name);
+        if (value == null) return "Kullanıcı";
+
+        String[] parts = value.split("\\s+");
+        List<String> masked = new ArrayList<>();
+        for (String part : parts) {
+            if (part.isBlank()) continue;
+            String first = part.substring(0, 1).toUpperCase(Locale.ROOT);
+            masked.add(first + "***");
+        }
+        return masked.isEmpty() ? "Kullanıcı" : String.join(" ", masked);
     }
 
     private boolean hasDeliveredPurchase(UUID userId, UUID productId) {
@@ -399,7 +413,7 @@ public class ProductReviewService {
 
         List<String> blockedWords = List.of("bahis", "casino", "xxx", "kumar", "bedava para", "yatırım tavsiyesi");
         boolean containsBlockedWord = blockedWords.stream().anyMatch(text::contains);
-        return containsBlockedWord ? ReviewStatus.REJECTED : ReviewStatus.PENDING;
+        return containsBlockedWord ? ReviewStatus.REJECTED : ReviewStatus.APPROVED;
     }
 
     private void validateReviewRequest(ReviewCreateRequest request) {

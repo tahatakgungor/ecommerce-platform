@@ -2,6 +2,7 @@ package com.ecommerce.product.application;
 
 import com.ecommerce.product.domain.*;
 import com.ecommerce.product.dto.review.ReviewCreateRequest;
+import com.ecommerce.product.dto.review.ReviewResponse;
 import com.ecommerce.product.dto.review.ReviewSummaryResponse;
 import com.ecommerce.product.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
@@ -150,7 +152,7 @@ class ProductReviewServiceTest {
     }
 
     @Test
-    void createReview_shouldCreatePendingVerifiedReview() throws Exception {
+    void createReview_shouldCreateApprovedVerifiedReviewForCleanContent() throws Exception {
         UUID productId = UUID.randomUUID();
         User user = customer("customer@example.com");
         user.setName("Ali Veli");
@@ -183,8 +185,42 @@ class ProductReviewServiceTest {
 
         ProductReview saved = captor.getValue();
         assertTrue(saved.isVerifiedPurchase());
-        assertEquals(ReviewStatus.PENDING, saved.getStatus());
+        assertEquals(ReviewStatus.APPROVED, saved.getStatus());
         assertEquals(4, saved.getRating());
+    }
+
+    @Test
+    void createReview_shouldRejectBlockedWordContent() {
+        UUID productId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+        user.setName("Ali Veli");
+        Product product = new Product();
+        product.setId(productId);
+
+        Order deliveredOrder = new Order();
+        deliveredOrder.setStatus("delivered");
+        deliveredOrder.setCart("[{\"_id\":\"" + productId + "\",\"orderQuantity\":1}]");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId().toString())).thenReturn(List.of(deliveredOrder));
+        when(productReviewRepository.findByProductIdAndUserId(productId, user.getId())).thenReturn(Optional.empty());
+        when(productReviewRepository.save(any(ProductReview.class))).thenAnswer(invocation -> {
+            ProductReview review = invocation.getArgument(0);
+            review.setId(UUID.randomUUID());
+            return review;
+        });
+
+        ReviewCreateRequest request = new ReviewCreateRequest();
+        request.setRating(1);
+        request.setCommentBody("Bu içerik casino kelimesi içeriyor.");
+
+        productReviewService.createReview(productId, request, "customer@example.com");
+
+        ArgumentCaptor<ProductReview> captor = ArgumentCaptor.forClass(ProductReview.class);
+        verify(productReviewRepository).save(captor.capture());
+        ProductReview saved = captor.getValue();
+        assertEquals(ReviewStatus.REJECTED, saved.getStatus());
     }
 
     @Test
@@ -223,6 +259,39 @@ class ProductReviewServiceTest {
 
         assertEquals(4.67d, summary.getAverageRating());
         assertEquals(15L, summary.getTotalReviews());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getApprovedReviews_shouldMaskReviewerName() {
+        UUID productId = UUID.randomUUID();
+        Product product = new Product();
+        product.setId(productId);
+
+        User reviewer = customer("reviewer@example.com");
+        reviewer.setName("Taha Turan Akgüngör");
+
+        ProductReview review = new ProductReview();
+        review.setId(UUID.randomUUID());
+        review.setProduct(product);
+        review.setUser(reviewer);
+        review.setStatus(ReviewStatus.APPROVED);
+        review.setRating(5);
+        review.setCommentBody("Çok iyi ürün.");
+
+        when(productRepository.existsById(productId)).thenReturn(true);
+        when(productReviewRepository.findByProductIdAndStatus(any(UUID.class), any(ReviewStatus.class), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(review)));
+        when(productReviewRepository.findAverageAndCountByProductAndStatus(productId, ReviewStatus.APPROVED))
+                .thenReturn(List.<Object[]>of(new Object[]{5.0d, 1L}));
+        when(productReviewRepository.findRatingDistributionByProductAndStatus(productId, ReviewStatus.APPROVED))
+                .thenReturn(List.<Object[]>of(new Object[]{5, 1L}));
+
+        Map<String, Object> result = productReviewService.getApprovedReviews(productId, "newest", false, 0, 8);
+        List<?> reviews = (List<?>) result.get("reviews");
+        assertEquals(1, reviews.size());
+        ReviewResponse response = (ReviewResponse) reviews.get(0);
+        assertEquals("T*** T*** A***", response.getUserName());
     }
 
     @Test
