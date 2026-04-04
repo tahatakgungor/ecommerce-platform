@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -103,6 +104,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/{id}").permitAll()
                         .requestMatchers("/api/products/discount").permitAll()
                         .requestMatchers("/api/products/relatedProduct").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/*/reviews").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/*/reviews/summary").permitAll()
                         .requestMatchers("/api/category/show").permitAll()
                         .requestMatchers("/api/brand/all").permitAll()
                         .requestMatchers("/api/category/all").permitAll()
