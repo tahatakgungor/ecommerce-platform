@@ -18,9 +18,8 @@ public class InvitationService {
     private final InvitationRepository invitationRepository;
     private final UserRepository userRepository;
 
-    // application.yaml içindeki app.frontend-url değerini çeker
-    @Value("${app.frontend-url}")
-    private String frontendUrl;
+    @Value("${app.admin-frontend-url:http://localhost:3001}")
+    private String adminFrontendUrl;
 
     @Transactional
     public String createInvitation(String email, String role) {
@@ -48,8 +47,7 @@ public class InvitationService {
 
         invitationRepository.save(invite);
 
-        // ARTIK BURASI DİNAMİK: Local'de http://localhost:3000, Railway'de Vercel linki olur.
-        return frontendUrl + "/register?token=" + token;
+        return adminFrontendUrl + "/register?token=" + token;
     }
 
     public Invitation validateAndGetInvite(String token) {
