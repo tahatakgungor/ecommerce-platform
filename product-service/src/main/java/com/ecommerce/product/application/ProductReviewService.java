@@ -39,19 +39,10 @@ public class ProductReviewService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
-        if (!"Customer".equalsIgnoreCase(user.getRole())) {
-            throw new RuntimeException("Sadece müşteri hesapları ürün değerlendirmesi yapabilir.");
+        ReviewEligibilityResponse eligibility = evaluateEligibility(productId, user);
+        if (!eligibility.isCanReview()) {
+            throw new RuntimeException(eligibility.getReason());
         }
-
-        boolean verifiedPurchase = hasDeliveredPurchase(user.getId(), productId);
-        if (!verifiedPurchase) {
-            throw new RuntimeException("Yorum yapabilmek için ürün siparişinizin teslim edilmiş olması gerekir.");
-        }
-
-        productReviewRepository.findByProductIdAndUserId(productId, user.getId())
-                .ifPresent(r -> {
-                    throw new RuntimeException("Bu ürün için zaten bir yorumunuz var. Düzenleme yapabilirsiniz.");
-                });
 
         ProductReview review = new ProductReview();
         review.setProduct(product);
@@ -65,6 +56,16 @@ public class ProductReviewService {
 
         ProductReview saved = productReviewRepository.save(review);
         return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewEligibilityResponse getReviewEligibility(UUID productId, String userEmail) {
+        ensureProductExists(productId);
+
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
+
+        return evaluateEligibility(productId, user);
     }
 
     @Transactional
@@ -269,6 +270,34 @@ public class ProductReviewService {
                 .flatMap(cart -> parseCartItems(cart).stream())
                 .map(this::extractProductIdFromCartItem)
                 .anyMatch(productId::equals);
+    }
+
+    private ReviewEligibilityResponse evaluateEligibility(UUID productId, User user) {
+        if (!"Customer".equalsIgnoreCase(trimNullable(user.getRole()))) {
+            return ReviewEligibilityResponse.builder()
+                    .canReview(false)
+                    .deliveredPurchase(false)
+                    .alreadyReviewed(false)
+                    .reason("Sadece müşteri hesapları ürün değerlendirmesi yapabilir.")
+                    .build();
+        }
+
+        boolean deliveredPurchase = hasDeliveredPurchase(user.getId(), productId);
+        boolean alreadyReviewed = productReviewRepository.findByProductIdAndUserId(productId, user.getId()).isPresent();
+
+        String reason = null;
+        if (!deliveredPurchase) {
+            reason = "Yorum yapabilmek için ürün siparişinizin teslim edilmiş olması gerekir.";
+        } else if (alreadyReviewed) {
+            reason = "Bu ürün için zaten bir yorumunuz var. Düzenleme yapabilirsiniz.";
+        }
+
+        return ReviewEligibilityResponse.builder()
+                .canReview(deliveredPurchase && !alreadyReviewed)
+                .deliveredPurchase(deliveredPurchase)
+                .alreadyReviewed(alreadyReviewed)
+                .reason(reason)
+                .build();
     }
 
     private List<Map<String, Object>> parseCartItems(String cartJson) {
