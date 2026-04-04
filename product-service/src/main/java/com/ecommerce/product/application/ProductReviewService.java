@@ -461,8 +461,8 @@ public class ProductReviewService {
 
         for (String media : normalized) {
             String lower = media.toLowerCase(Locale.ROOT);
-            if (!(lower.startsWith("http://") || lower.startsWith("https://"))) {
-                throw new RuntimeException("Medya bağlantısı http/https ile başlamalıdır.");
+            if (!(lower.startsWith("http://") || lower.startsWith("https://") || media.startsWith("/"))) {
+                throw new RuntimeException("Medya bağlantısı geçerli bir URL veya /uploads yolu olmalıdır.");
             }
             if (media.length() > 500) {
                 throw new RuntimeException("Medya bağlantısı çok uzun.");
