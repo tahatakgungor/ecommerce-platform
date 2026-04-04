@@ -413,7 +413,7 @@ public class ProductReviewService {
 
         List<String> blockedWords = List.of("bahis", "casino", "xxx", "kumar", "bedava para", "yatırım tavsiyesi");
         boolean containsBlockedWord = blockedWords.stream().anyMatch(text::contains);
-        return containsBlockedWord ? ReviewStatus.REJECTED : ReviewStatus.APPROVED;
+        return containsBlockedWord ? ReviewStatus.REJECTED : ReviewStatus.PENDING;
     }
 
     private void validateReviewRequest(ReviewCreateRequest request) {

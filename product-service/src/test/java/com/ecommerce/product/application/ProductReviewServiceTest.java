@@ -152,7 +152,7 @@ class ProductReviewServiceTest {
     }
 
     @Test
-    void createReview_shouldCreateApprovedVerifiedReviewForCleanContent() throws Exception {
+    void createReview_shouldCreatePendingVerifiedReviewForCleanContent() throws Exception {
         UUID productId = UUID.randomUUID();
         User user = customer("customer@example.com");
         user.setName("Ali Veli");
@@ -185,7 +185,7 @@ class ProductReviewServiceTest {
 
         ProductReview saved = captor.getValue();
         assertTrue(saved.isVerifiedPurchase());
-        assertEquals(ReviewStatus.APPROVED, saved.getStatus());
+        assertEquals(ReviewStatus.PENDING, saved.getStatus());
         assertEquals(4, saved.getRating());
     }
 
