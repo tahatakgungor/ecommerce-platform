@@ -1,17 +1,20 @@
 package com.ecommerce.product.api.client;
 
 import com.ecommerce.product.application.CustomerService;
+import com.ecommerce.product.application.SecurityRateLimitService;
 import com.ecommerce.product.dto.ApiResponse;
 import com.ecommerce.product.dto.auth.CustomerLoginResponse;
 import com.ecommerce.product.dto.auth.CustomerSignupRequest;
 import com.ecommerce.product.dto.auth.CustomerUserDto;
 
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.Map;
 
 @RestController
@@ -20,6 +23,7 @@ import java.util.Map;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final SecurityRateLimitService rateLimitService;
 
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<CustomerLoginResponse>> signup(@RequestBody CustomerSignupRequest request) {
@@ -32,10 +36,28 @@ public class CustomerController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<CustomerLoginResponse>> login(
             @RequestBody Map<String, String> body,
+            HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         String email = body.get("email");
         String password = body.get("password");
-        CustomerLoginResponse result = customerService.login(email, password);
+        String clientIp = extractClientIp(httpRequest);
+        String limitKey = "customer-login:" + normalize(email) + ":" + clientIp;
+        Duration window = Duration.ofMinutes(15);
+        rateLimitService.assertAllowed(
+                limitKey,
+                10,
+                window,
+                "Çok fazla giriş denemesi yapıldı. Lütfen 15 dakika sonra tekrar deneyin."
+        );
+
+        CustomerLoginResponse result;
+        try {
+            result = customerService.login(email, password);
+            rateLimitService.clearFailures(limitKey);
+        } catch (RuntimeException ex) {
+            rateLimitService.registerFailure(limitKey, window);
+            throw ex;
+        }
         // httpOnly cookie: token JS tarafından okunamaz
         setAuthCookie(httpResponse, result.token());
         ApiResponse<CustomerLoginResponse> response = new ApiResponse<>(true, result, null);
@@ -93,8 +115,27 @@ public class CustomerController {
     }
 
     @PatchMapping("/forget-password")
-    public ResponseEntity<ApiResponse<String>> forgetPassword(@RequestBody Map<String, String> body) {
-        customerService.forgetPassword(body.get("email"));
+    public ResponseEntity<ApiResponse<String>> forgetPassword(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest httpRequest) {
+        String email = body.get("email");
+        String clientIp = extractClientIp(httpRequest);
+        String limitKey = "customer-forgot-password:" + normalize(email) + ":" + clientIp;
+        Duration window = Duration.ofMinutes(30);
+        rateLimitService.assertAllowed(
+                limitKey,
+                5,
+                window,
+                "Çok fazla şifre sıfırlama denemesi yapıldı. Lütfen daha sonra tekrar deneyin."
+        );
+
+        try {
+            customerService.forgetPassword(email);
+            rateLimitService.clearFailures(limitKey);
+        } catch (RuntimeException ex) {
+            rateLimitService.registerFailure(limitKey, window);
+            throw ex;
+        }
         ApiResponse<String> response = new ApiResponse<>(true, null, null);
         response.setMessage("Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.");
         return ResponseEntity.ok(response);
@@ -143,5 +184,17 @@ public class CustomerController {
         ApiResponse<String> response = new ApiResponse<>(true, null, null);
         response.setMessage("Bültenimize başarıyla abone oldunuz!");
         return ResponseEntity.ok(response);
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
     }
 }

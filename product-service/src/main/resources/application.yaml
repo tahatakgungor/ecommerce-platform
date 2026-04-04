@@ -31,6 +31,8 @@ app:
     secret: ${JWT_SECRET:local-dev-secret-key-must-be-at-least-32-chars}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
   admin-frontend-url: ${ADMIN_FRONTEND_URL:http://localhost:3001}
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:3000,http://localhost:3001}
   seed-data: ${SEED_DATA:false}
   mail:
     resend:

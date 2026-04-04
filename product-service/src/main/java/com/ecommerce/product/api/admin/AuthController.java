@@ -3,17 +3,20 @@ package com.ecommerce.product.api.admin;
 import com.ecommerce.product.application.AuthService;
 import com.ecommerce.product.application.EmailService;
 import com.ecommerce.product.application.InvitationService;
+import com.ecommerce.product.application.SecurityRateLimitService;
 import com.ecommerce.product.domain.Invitation;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.dto.ApiResponse;
 import com.ecommerce.product.dto.auth.LoginRequest;
 import com.ecommerce.product.dto.auth.LoginResponse;
 import com.ecommerce.product.dto.auth.RegisterRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,12 +28,32 @@ public class AuthController {
     private final AuthService authService;
     private final InvitationService invitationService;
     private final EmailService emailService;
+    private final SecurityRateLimitService rateLimitService;
 
     // --- GİRİŞ, KAYIT VE ŞİFRE SIFIRLAMA ---
 
     @PatchMapping("/forget-password")
-    public ApiResponse<String> forgetPassword(@RequestBody Map<String, String> request) {
-        authService.forgetPassword(request.get("email"));
+    public ApiResponse<String> forgetPassword(
+            @RequestBody Map<String, String> request,
+            HttpServletRequest httpRequest) {
+        String email = request.get("email");
+        String clientIp = extractClientIp(httpRequest);
+        String limitKey = "admin-forgot-password:" + normalize(email) + ":" + clientIp;
+        Duration window = Duration.ofMinutes(30);
+        rateLimitService.assertAllowed(
+                limitKey,
+                5,
+                window,
+                "Çok fazla şifre sıfırlama denemesi yapıldı. Lütfen daha sonra tekrar deneyin."
+        );
+
+        try {
+            authService.forgetPassword(email);
+            rateLimitService.clearFailures(limitKey);
+        } catch (RuntimeException ex) {
+            rateLimitService.registerFailure(limitKey, window);
+            throw ex;
+        }
         return ApiResponse.ok("Şifre sıfırlama talimatları e-posta adresinize gönderildi.", 1L);
     }
 
@@ -54,8 +77,25 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
+    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+        String clientIp = extractClientIp(httpRequest);
+        String limitKey = "admin-login:" + normalize(request.email()) + ":" + clientIp;
+        Duration window = Duration.ofMinutes(15);
+        rateLimitService.assertAllowed(
+                limitKey,
+                10,
+                window,
+                "Çok fazla giriş denemesi yapıldı. Lütfen 15 dakika sonra tekrar deneyin."
+        );
+
+        LoginResponse response;
+        try {
+            response = authService.login(request);
+            rateLimitService.clearFailures(limitKey);
+        } catch (RuntimeException ex) {
+            rateLimitService.registerFailure(limitKey, window);
+            throw ex;
+        }
         return ApiResponse.ok(response, 1L);
     }
 
@@ -154,5 +194,17 @@ public class AuthController {
         String newRole = request.get("role");
         authService.updateUserRole(id, newRole); // AuthService içinde bu metodu yazmalısın
         return ApiResponse.ok("Personel rolü başarıyla " + newRole + " olarak güncellendi.", 1L);
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
     }
 }
