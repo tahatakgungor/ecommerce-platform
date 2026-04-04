@@ -267,6 +267,15 @@ public class ProductReviewService {
         return toResponse(productReviewRepository.save(review));
     }
 
+    @Transactional
+    @CacheEvict(cacheNames = "productReviewSummary", allEntries = true)
+    public void deleteReview(UUID reviewId) {
+        ProductReview review = productReviewRepository.findById(reviewId)
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadı."));
+        feedbackRepository.deleteByReviewId(reviewId);
+        productReviewRepository.delete(review);
+    }
+
     private void applyVoteDelta(ProductReview review, ReviewVoteType type, int delta) {
         if (type == ReviewVoteType.HELPFUL) {
             long updated = Math.max(0L, (review.getHelpfulCount() == null ? 0L : review.getHelpfulCount()) + delta);

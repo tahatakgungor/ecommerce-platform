@@ -39,4 +39,10 @@ public class ProductReviewAdminController {
         ReviewResponse response = productReviewService.updateReviewStatus(reviewId, request.getStatus());
         return ResponseEntity.ok(ApiResponse.ok(response, 1L));
     }
+
+    @DeleteMapping("/{reviewId}")
+    public ResponseEntity<ApiResponse<String>> deleteReview(@PathVariable UUID reviewId) {
+        productReviewService.deleteReview(reviewId);
+        return ResponseEntity.ok(ApiResponse.ok("Yorum silindi.", 1L));
+    }
 }

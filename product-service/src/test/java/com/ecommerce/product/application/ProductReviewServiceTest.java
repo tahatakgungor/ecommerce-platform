@@ -479,6 +479,20 @@ class ProductReviewServiceTest {
         assertEquals("https://cdn.example.com/review.jpg", url);
     }
 
+    @Test
+    void deleteReview_shouldDeleteFeedbackThenReview() {
+        UUID reviewId = UUID.randomUUID();
+        ProductReview review = new ProductReview();
+        review.setId(reviewId);
+
+        when(productReviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
+
+        productReviewService.deleteReview(reviewId);
+
+        verify(productReviewFeedbackRepository).deleteByReviewId(reviewId);
+        verify(productReviewRepository).delete(review);
+    }
+
     private User customer(String email) {
         User user = new User();
         user.setId(UUID.randomUUID());
