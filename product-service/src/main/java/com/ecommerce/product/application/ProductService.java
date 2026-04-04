@@ -45,7 +45,9 @@ public class ProductService {
         if (details.getDescription() != null) existing.setDescription(details.getDescription());
         if (details.getPrice() != null) {
             existing.setPrice(details.getPrice());
-            existing.setOriginalPrice(details.getPrice());
+        }
+        if (details.getOriginalPrice() != null && details.getOriginalPrice() > 0) {
+            existing.setOriginalPrice(details.getOriginalPrice());
         }
         if (details.getStockQuantity() != null) existing.setStockQuantity(details.getStockQuantity());
         if (details.getSku() != null) existing.setSku(details.getSku());
@@ -56,6 +58,13 @@ public class ProductService {
         if (details.getBrandName() != null) existing.setBrandName(details.getBrandName());
         if (details.getTags() != null) existing.setTags(details.getTags());
         if (details.getColors() != null) existing.setColors(details.getColors());
+
+        // İndirim yüzdesinin negatif olmaması için güvenlik:
+        // originalPrice hiçbir durumda price'dan küçük kalmasın.
+        if (existing.getPrice() != null && existing.getOriginalPrice() != null
+                && existing.getOriginalPrice() < existing.getPrice()) {
+            existing.setOriginalPrice(existing.getPrice());
+        }
 
         return productRepository.save(existing);
     }

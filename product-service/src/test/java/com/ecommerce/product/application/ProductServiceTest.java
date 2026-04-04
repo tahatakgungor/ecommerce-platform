@@ -48,7 +48,7 @@ class ProductServiceTest {
     }
 
     @Test
-    void update_whenPriceProvided_shouldSyncOriginalPrice() {
+    void update_whenOnlyPriceProvided_shouldKeepExistingOriginalPrice() {
         UUID id = UUID.randomUUID();
         Product existing = new Product();
         existing.setId(id);
@@ -58,7 +58,7 @@ class ProductServiceTest {
 
         Product patch = new Product();
         patch.setName("Yeni Ürün");
-        patch.setPrice(220.0);
+        patch.setPrice(120.0);
 
         when(productRepository.findById(id)).thenReturn(Optional.of(existing));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -69,8 +69,32 @@ class ProductServiceTest {
         verify(productRepository).save(captor.capture());
         Product saved = captor.getValue();
         assertEquals("Yeni Ürün", saved.getName());
-        assertEquals(220.0, saved.getPrice());
-        assertEquals(220.0, saved.getOriginalPrice());
+        assertEquals(120.0, saved.getPrice());
+        assertEquals(140.0, saved.getOriginalPrice());
+    }
+
+    @Test
+    void update_whenOriginalPriceExplicitlyProvided_shouldUseProvidedOriginalPrice() {
+        UUID id = UUID.randomUUID();
+        Product existing = new Product();
+        existing.setId(id);
+        existing.setPrice(100.0);
+        existing.setOriginalPrice(140.0);
+
+        Product patch = new Product();
+        patch.setPrice(90.0);
+        patch.setOriginalPrice(150.0);
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        productService.update(id, patch);
+
+        ArgumentCaptor<Product> captor = ArgumentCaptor.forClass(Product.class);
+        verify(productRepository).save(captor.capture());
+        Product saved = captor.getValue();
+        assertEquals(90.0, saved.getPrice());
+        assertEquals(150.0, saved.getOriginalPrice());
     }
 
     @Test
