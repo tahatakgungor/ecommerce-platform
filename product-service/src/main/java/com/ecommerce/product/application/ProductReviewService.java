@@ -273,7 +273,7 @@ public class ProductReviewService {
     }
 
     private ReviewEligibilityResponse evaluateEligibility(UUID productId, User user) {
-        if (!"Customer".equalsIgnoreCase(trimNullable(user.getRole()))) {
+        if (!isCustomerRole(user.getRole())) {
             return ReviewEligibilityResponse.builder()
                     .canReview(false)
                     .deliveredPurchase(false)
@@ -298,6 +298,13 @@ public class ProductReviewService {
                 .alreadyReviewed(alreadyReviewed)
                 .reason(reason)
                 .build();
+    }
+
+    private boolean isCustomerRole(String role) {
+        String normalized = trimNullable(role);
+        if (normalized == null) return false;
+        String upper = normalized.toUpperCase(Locale.ROOT);
+        return "CUSTOMER".equals(upper) || "ROLE_CUSTOMER".equals(upper) || "USER".equals(upper) || "ROLE_USER".equals(upper);
     }
 
     private List<Map<String, Object>> parseCartItems(String cartJson) {

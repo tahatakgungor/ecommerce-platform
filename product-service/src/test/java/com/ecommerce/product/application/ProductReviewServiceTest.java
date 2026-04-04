@@ -300,6 +300,27 @@ class ProductReviewServiceTest {
         assertEquals("Bu ürün için zaten bir yorumunuz var. Düzenleme yapabilirsiniz.", eligibility.getReason());
     }
 
+    @Test
+    void getReviewEligibility_shouldAllowLegacyUserRoleForDeliveredPurchase() {
+        UUID productId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+        user.setRole("User");
+
+        Order deliveredOrder = new Order();
+        deliveredOrder.setStatus("delivered");
+        deliveredOrder.setCart("[{\"_id\":\"" + productId + "\",\"orderQuantity\":1}]");
+
+        when(productRepository.existsById(productId)).thenReturn(true);
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId().toString())).thenReturn(List.of(deliveredOrder));
+        when(productReviewRepository.findByProductIdAndUserId(productId, user.getId())).thenReturn(Optional.empty());
+
+        var eligibility = productReviewService.getReviewEligibility(productId, "customer@example.com");
+
+        assertTrue(eligibility.isCanReview());
+        assertEquals(null, eligibility.getReason());
+    }
+
     private User customer(String email) {
         User user = new User();
         user.setId(UUID.randomUUID());
