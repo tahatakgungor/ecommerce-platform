@@ -123,20 +123,26 @@ public class ProductReviewService {
     public ReviewSummaryResponse getReviewSummary(UUID productId) {
         ensureProductExists(productId);
 
-        Object[] avgCount = productReviewRepository.findAverageAndCountByProductAndStatus(productId, ReviewStatus.APPROVED);
-        double avg = avgCount != null && avgCount.length > 0 && avgCount[0] != null
-                ? ((Number) avgCount[0]).doubleValue()
-                : 0.0;
-        long total = avgCount != null && avgCount.length > 1 && avgCount[1] != null
-                ? ((Number) avgCount[1]).longValue()
-                : 0L;
+        List<Object[]> avgRows = productReviewRepository.findAverageAndCountByProductAndStatus(productId, ReviewStatus.APPROVED);
+        Object avgRaw = null;
+        Object totalRaw = null;
+        if (avgRows != null && !avgRows.isEmpty()) {
+            Object[] row = avgRows.get(0);
+            if (row != null && row.length == 1 && row[0] instanceof Object[] nested) {
+                row = nested;
+            }
+            if (row != null && row.length > 0) avgRaw = row[0];
+            if (row != null && row.length > 1) totalRaw = row[1];
+        }
+        double avg = toDouble(avgRaw, 0.0);
+        long total = toLong(totalRaw, 0L);
 
         Map<Integer, Long> starCounts = new LinkedHashMap<>();
         for (int i = 5; i >= 1; i--) starCounts.put(i, 0L);
 
         for (Object[] row : productReviewRepository.findRatingDistributionByProductAndStatus(productId, ReviewStatus.APPROVED)) {
-            int star = ((Number) row[0]).intValue();
-            long count = ((Number) row[1]).longValue();
+            int star = toInt(row != null && row.length > 0 ? row[0] : null, -1);
+            long count = toLong(row != null && row.length > 1 ? row[1] : null, 0L);
             if (star >= 1 && star <= 5) starCounts.put(star, count);
         }
 
@@ -408,5 +414,38 @@ public class ProductReviewService {
 
     private double round2(double value) {
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    private long toLong(Object value, long defaultValue) {
+        if (value == null) return defaultValue;
+        if (value instanceof Number n) return n.longValue();
+        if (value instanceof Object[] arr && arr.length > 0) return toLong(arr[0], defaultValue);
+        try {
+            return Long.parseLong(value.toString());
+        } catch (Exception ex) {
+            return defaultValue;
+        }
+    }
+
+    private int toInt(Object value, int defaultValue) {
+        if (value == null) return defaultValue;
+        if (value instanceof Number n) return n.intValue();
+        if (value instanceof Object[] arr && arr.length > 0) return toInt(arr[0], defaultValue);
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception ex) {
+            return defaultValue;
+        }
+    }
+
+    private double toDouble(Object value, double defaultValue) {
+        if (value == null) return defaultValue;
+        if (value instanceof Number n) return n.doubleValue();
+        if (value instanceof Object[] arr && arr.length > 0) return toDouble(arr[0], defaultValue);
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (Exception ex) {
+            return defaultValue;
+        }
     }
 }

@@ -18,6 +18,8 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, UU
 
     Optional<ProductReview> findByIdAndProductId(UUID reviewId, UUID productId);
 
+    List<ProductReview> findByProductId(UUID productId);
+
     Page<ProductReview> findByProductIdAndStatus(UUID productId, ReviewStatus status, Pageable pageable);
 
     @Query("""
@@ -39,8 +41,8 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, UU
             FROM ProductReview r
             WHERE r.product.id = :productId AND r.status = :status
             """)
-    Object[] findAverageAndCountByProductAndStatus(@Param("productId") UUID productId,
-                                                   @Param("status") ReviewStatus status);
+    List<Object[]> findAverageAndCountByProductAndStatus(@Param("productId") UUID productId,
+                                                         @Param("status") ReviewStatus status);
 
     @Query("""
             SELECT r.rating, COUNT(r)
@@ -50,4 +52,6 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, UU
             """)
     List<Object[]> findRatingDistributionByProductAndStatus(@Param("productId") UUID productId,
                                                             @Param("status") ReviewStatus status);
+
+    long countByProductIdAndStatus(UUID productId, ReviewStatus status);
 }

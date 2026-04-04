@@ -69,6 +69,57 @@ class ProductReviewServiceTest {
     }
 
     @Test
+    void createReview_shouldRejectWhenOrderIsNotDeliveredEvenIfProductExistsInCart() {
+        UUID productId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+        Product product = new Product();
+        product.setId(productId);
+
+        Order processingOrder = new Order();
+        processingOrder.setStatus("processing");
+        processingOrder.setCart("[{\"_id\":\"" + productId + "\",\"orderQuantity\":1}]");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId().toString())).thenReturn(List.of(processingOrder));
+
+        ReviewCreateRequest request = new ReviewCreateRequest();
+        request.setRating(5);
+        request.setCommentBody("Harika ürün gerçekten");
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> productReviewService.createReview(productId, request, "customer@example.com"));
+
+        assertEquals("Yorum yapabilmek için ürün siparişinizin teslim edilmiş olması gerekir.", ex.getMessage());
+    }
+
+    @Test
+    void createReview_shouldRejectWhenDeliveredOrderDoesNotContainProduct() {
+        UUID productId = UUID.randomUUID();
+        UUID anotherProductId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+        Product product = new Product();
+        product.setId(productId);
+
+        Order deliveredOrder = new Order();
+        deliveredOrder.setStatus("delivered");
+        deliveredOrder.setCart("[{\"_id\":\"" + anotherProductId + "\",\"orderQuantity\":1}]");
+
+        when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId().toString())).thenReturn(List.of(deliveredOrder));
+
+        ReviewCreateRequest request = new ReviewCreateRequest();
+        request.setRating(5);
+        request.setCommentBody("Harika ürün gerçekten");
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> productReviewService.createReview(productId, request, "customer@example.com"));
+
+        assertEquals("Yorum yapabilmek için ürün siparişinizin teslim edilmiş olması gerekir.", ex.getMessage());
+    }
+
+    @Test
     void createReview_shouldRejectDuplicateReview() throws Exception {
         UUID productId = UUID.randomUUID();
         User user = customer("customer@example.com");
@@ -136,7 +187,7 @@ class ProductReviewServiceTest {
         UUID productId = UUID.randomUUID();
         when(productRepository.existsById(productId)).thenReturn(true);
         when(productReviewRepository.findAverageAndCountByProductAndStatus(productId, ReviewStatus.APPROVED))
-                .thenReturn(new Object[]{4.25d, 20L});
+                .thenReturn(List.<Object[]>of(new Object[]{4.25d, 20L}));
         when(productReviewRepository.findRatingDistributionByProductAndStatus(productId, ReviewStatus.APPROVED))
                 .thenReturn(List.of(
                         new Object[]{5, 12L},
@@ -152,6 +203,21 @@ class ProductReviewServiceTest {
         assertEquals(12L, summary.getStarCounts().get(5));
         assertEquals(60.0d, summary.getStarPercentages().get(5));
         assertEquals(0L, summary.getStarCounts().get(2));
+    }
+
+    @Test
+    void getReviewSummary_shouldNotFailOnNestedAggregateRow() {
+        UUID productId = UUID.randomUUID();
+        when(productRepository.existsById(productId)).thenReturn(true);
+        when(productReviewRepository.findAverageAndCountByProductAndStatus(productId, ReviewStatus.APPROVED))
+                .thenReturn(List.<Object[]>of(new Object[]{new Object[]{4.67d, 15L}}));
+        when(productReviewRepository.findRatingDistributionByProductAndStatus(productId, ReviewStatus.APPROVED))
+                .thenReturn(List.of(new Object[]{5, 12L}, new Object[]{4, 3L}));
+
+        ReviewSummaryResponse summary = productReviewService.getReviewSummary(productId);
+
+        assertEquals(4.67d, summary.getAverageRating());
+        assertEquals(15L, summary.getTotalReviews());
     }
 
     @Test
