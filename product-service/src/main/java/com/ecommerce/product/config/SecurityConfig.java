@@ -14,6 +14,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -55,6 +56,7 @@ public class SecurityConfig {
         csrfTokenRepository.setCookieName("XSRF-TOKEN");
         csrfTokenRepository.setHeaderName("X-XSRF-TOKEN");
         csrfTokenRepository.setCookiePath("/");
+        RequestMatcher bearerTokenRequestMatcher = this::hasBearerAuthorization;
 
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -73,6 +75,7 @@ public class SecurityConfig {
                 )
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
+                        .ignoringRequestMatchers(bearerTokenRequestMatcher)
                         .ignoringRequestMatchers(
                                 "/api/admin/login",
                                 "/api/admin/register",
@@ -140,6 +143,13 @@ public class SecurityConfig {
                 org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    boolean hasBearerAuthorization(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        return authHeader != null
+                && authHeader.startsWith("Bearer ")
+                && authHeader.length() > "Bearer ".length();
     }
 
     @Bean
