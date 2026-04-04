@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 import java.util.UUID;
@@ -44,6 +45,16 @@ public class ProductReviewController {
     ) {
         ReviewEligibilityResponse response = productReviewService.getReviewEligibility(productId, authentication.getName());
         return ResponseEntity.ok(ApiResponse.ok(response, 1L));
+    }
+
+    @PostMapping("/media-upload")
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadReviewMedia(
+            @PathVariable UUID productId,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication
+    ) {
+        String url = productReviewService.uploadReviewMedia(productId, file, authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok(Map.of("url", url), 1L));
     }
 
     @PostMapping

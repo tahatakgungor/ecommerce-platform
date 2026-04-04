@@ -12,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,9 @@ class ProductReviewServiceTest {
 
     @Mock
     private OrderRepository orderRepository;
+
+    @Mock
+    private FileUploadService fileUploadService;
 
     @Spy
     private ObjectMapper objectMapper;
@@ -319,6 +323,20 @@ class ProductReviewServiceTest {
 
         assertTrue(eligibility.isCanReview());
         assertEquals(null, eligibility.getReason());
+    }
+
+    @Test
+    void uploadReviewMedia_shouldAllowImageForCustomerRole() {
+        UUID productId = UUID.randomUUID();
+        User user = customer("customer@example.com");
+        MockMultipartFile file = new MockMultipartFile("file", "review.jpg", "image/jpeg", "img".getBytes());
+
+        when(productRepository.existsById(productId)).thenReturn(true);
+        when(userRepository.findByEmail("customer@example.com")).thenReturn(Optional.of(user));
+        when(fileUploadService.saveFile(file)).thenReturn("https://cdn.example.com/review.jpg");
+
+        String url = productReviewService.uploadReviewMedia(productId, file, "customer@example.com");
+        assertEquals("https://cdn.example.com/review.jpg", url);
     }
 
     private User customer(String email) {

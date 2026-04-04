@@ -26,6 +26,7 @@ public class ProductReviewService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+    private final FileUploadService fileUploadService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -66,6 +67,30 @@ public class ProductReviewService {
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
 
         return evaluateEligibility(productId, user);
+    }
+
+    @Transactional
+    public String uploadReviewMedia(UUID productId, org.springframework.web.multipart.MultipartFile file, String userEmail) {
+        ensureProductExists(productId);
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
+
+        if (!isCustomerRole(user.getRole())) {
+            throw new RuntimeException("Sadece müşteri hesapları görsel yükleyebilir.");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Yüklenecek görsel bulunamadı.");
+        }
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new RuntimeException("Görsel boyutu 5MB'dan büyük olamaz.");
+        }
+
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            throw new RuntimeException("Sadece görsel dosyaları yüklenebilir.");
+        }
+
+        return fileUploadService.saveFile(file);
     }
 
     @Transactional
