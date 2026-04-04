@@ -110,6 +110,7 @@ public class ProductController {
                 .brand(new ProductResponse.BrandInfo(product.getBrandName() != null ? product.getBrandName() : ""))
                 .category(new ProductResponse.CategoryInfo(product.getCategoryName() != null ? product.getCategoryName() : ""))
                 .tags(product.getTags())
+                .relatedImages(product.getRelatedImages())
                 .colors(product.getColors())
                 .build();
     }
@@ -140,6 +141,7 @@ public class ProductController {
         product.setCategoryName(extractString(request.getCategory()));
         product.setBrandName(extractString(request.getBrand()));
         product.setImage(extractString(request.getImage()));
+        product.setRelatedImages(normalizeStringList(request.getRelatedImages()));
         if (request.getStatus() != null) product.setStatus(request.getStatus());
 
         return product;
@@ -163,5 +165,14 @@ public class ProductController {
             return map.values().stream().findFirst().map(Object::toString).orElse(null);
         }
         return obj.toString();
+    }
+
+    private List<String> normalizeStringList(List<String> values) {
+        if (values == null) return List.of();
+        return values.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 }

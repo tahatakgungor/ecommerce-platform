@@ -60,6 +60,11 @@ public class Product {
     private List<String> tags = new ArrayList<>();
 
     @ElementCollection
+    @CollectionTable(name = "product_related_images", joinColumns = @JoinColumn(name = "product_id"))
+    @JsonProperty("relatedImages")
+    private List<String> relatedImages = new ArrayList<>();
+
+    @ElementCollection
     @CollectionTable(name = "product_colors", joinColumns = @JoinColumn(name = "product_id"))
     @JsonProperty("colors")
     private List<String> colors = new ArrayList<>();

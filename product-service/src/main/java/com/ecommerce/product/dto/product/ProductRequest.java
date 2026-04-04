@@ -24,6 +24,7 @@ public class ProductRequest {
     private Object children;
     private Object category;
     private Object brand;
+    private List<String> relatedImages;
 
     private String status;
     private List<String> tags;

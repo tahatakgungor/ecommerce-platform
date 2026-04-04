@@ -11,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -123,5 +124,29 @@ class ProductServiceTest {
         productService.delete(id);
 
         verify(productRepository).deleteById(id);
+    }
+
+    @Test
+    void update_whenRelatedImagesProvided_shouldReplaceRelatedImages() {
+        UUID id = UUID.randomUUID();
+        Product existing = new Product();
+        existing.setId(id);
+        existing.setName("Urun");
+        existing.setRelatedImages(List.of("https://old.example.com/1.jpg"));
+
+        Product patch = new Product();
+        patch.setRelatedImages(List.of(
+                "https://cdn.example.com/new-1.jpg",
+                "https://cdn.example.com/new-2.jpg"
+        ));
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Product updated = productService.update(id, patch);
+
+        assertEquals(2, updated.getRelatedImages().size());
+        assertEquals("https://cdn.example.com/new-1.jpg", updated.getRelatedImages().get(0));
+        assertEquals("https://cdn.example.com/new-2.jpg", updated.getRelatedImages().get(1));
     }
 }

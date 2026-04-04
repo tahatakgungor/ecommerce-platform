@@ -74,6 +74,7 @@ public class ProductClientController {
                 .brand(new ProductResponse.BrandInfo(p.getBrandName() != null ? p.getBrandName() : ""))
                 .category(new ProductResponse.CategoryInfo(p.getCategoryName() != null ? p.getCategoryName() : ""))
                 .tags(p.getTags())
+                .relatedImages(p.getRelatedImages())
                 .colors(p.getColors())
                 .build();
     }

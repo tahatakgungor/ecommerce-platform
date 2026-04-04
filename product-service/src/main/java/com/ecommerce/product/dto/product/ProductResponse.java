@@ -43,6 +43,7 @@ public class ProductResponse {
     private String childCategory;
 
     private List<String> tags;
+    private List<String> relatedImages;
     private List<String> colors;
 
     // Frontend'in .name okuyabilmesi için iç sınıflar

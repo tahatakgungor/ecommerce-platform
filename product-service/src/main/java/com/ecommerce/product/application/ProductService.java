@@ -57,6 +57,7 @@ public class ProductService {
         if (details.getCategoryName() != null) existing.setCategoryName(details.getCategoryName());
         if (details.getBrandName() != null) existing.setBrandName(details.getBrandName());
         if (details.getTags() != null) existing.setTags(details.getTags());
+        if (details.getRelatedImages() != null) existing.setRelatedImages(details.getRelatedImages());
         if (details.getColors() != null) existing.setColors(details.getColors());
 
         // İndirim yüzdesinin negatif olmaması için güvenlik:
