@@ -50,6 +50,13 @@ app:
       reply-to: ${RESEND_REPLY_TO:}
   stripe:
     secret-key: ${STRIPE_SECRET_KEY:}
+  upload:
+    provider: ${UPLOAD_PROVIDER:auto}
+    cloudinary:
+      cloud-name: ${CLOUDINARY_CLOUD_NAME:}
+      api-key: ${CLOUDINARY_API_KEY:}
+      api-secret: ${CLOUDINARY_API_SECRET:}
+      folder: ${CLOUDINARY_FOLDER:serravit}
   security:
     require-startup-validation: ${REQUIRE_STARTUP_VALIDATION:false}
 
