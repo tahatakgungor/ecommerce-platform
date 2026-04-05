@@ -41,8 +41,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ApiResponse<String> handleRuntimeExceptions(RuntimeException ex) {
-        log.warn("İş mantığı hatası: {}", ex.getMessage());
-        return ApiResponse.error(ex.getMessage());
+        log.warn("İş mantığı hatası: {}", ex.getMessage(), ex);
+        String message = (ex.getMessage() == null || ex.getMessage().isBlank())
+                ? ex.getClass().getSimpleName()
+                : ex.getMessage();
+        return ApiResponse.error(message);
     }
 
     // Genel Exception en sona

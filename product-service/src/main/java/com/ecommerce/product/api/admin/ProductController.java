@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @RestController
@@ -66,9 +67,14 @@ public class ProductController {
     @PutMapping("/update/{id}")
     @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ApiResponse<ProductResponse> updateProduct(@PathVariable("id") UUID id, @RequestBody ProductRequest request) {
-        Product product = convertToEntity(request);
-        Product updated = productService.update(id, product);
-        return ApiResponse.ok(convertToResponse(updated), 1L);
+        try {
+            Product product = convertToEntity(request);
+            Product updated = productService.update(id, product);
+            return ApiResponse.ok(convertToResponse(updated), 1L);
+        } catch (Exception ex) {
+            log.error("Ürün güncelleme hatası. id={} request={}", id, request, ex);
+            throw ex;
+        }
     }
 
     /**
@@ -124,8 +130,16 @@ public class ProductController {
         product.setDescription(request.getDescription());
         product.setStockQuantity(request.getStockQuantity());
         product.setSku(request.getSku());
-        product.setTags(request.getTags());
-        product.setColors(request.getColors());
+        if (request.getTags() != null) {
+            product.setTags(new ArrayList<>(request.getTags()));
+        } else {
+            product.setTags(null);
+        }
+        if (request.getColors() != null) {
+            product.setColors(new ArrayList<>(request.getColors()));
+        } else {
+            product.setColors(null);
+        }
 
         // Fiyat Ayarı
         if (request.getPrice() != null) {
@@ -141,7 +155,11 @@ public class ProductController {
         product.setCategoryName(extractString(request.getCategory()));
         product.setBrandName(extractString(request.getBrand()));
         product.setImage(extractString(request.getImage()));
-        product.setRelatedImages(normalizeStringList(request.getRelatedImages()));
+        if (request.getRelatedImages() != null) {
+            product.setRelatedImages(normalizeStringList(request.getRelatedImages()));
+        } else {
+            product.setRelatedImages(null);
+        }
         if (request.getStatus() != null) product.setStatus(request.getStatus());
 
         return product;
@@ -168,11 +186,11 @@ public class ProductController {
     }
 
     private List<String> normalizeStringList(List<String> values) {
-        if (values == null) return List.of();
+        if (values == null) return null;
         return values.stream()
                 .filter(v -> v != null && !v.isBlank())
                 .map(String::trim)
                 .distinct()
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 }
