@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.ArrayList;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -68,4 +70,14 @@ public class Product {
     @CollectionTable(name = "product_colors", joinColumns = @JoinColumn(name = "product_id"))
     @JsonProperty("colors")
     private List<String> colors = new ArrayList<>();
+
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now(ZoneId.of("Europe/Istanbul"));
+        }
+    }
 }

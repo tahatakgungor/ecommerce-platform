@@ -69,6 +69,21 @@ public class EmailService {
         );
     }
 
+    public void sendPasswordChangeVerificationEmail(String toEmail, String verificationCode) {
+        sendEmail(
+                toEmail,
+                "Şifre Değiştirme Doğrulama Kodu",
+                "Merhaba,\n\n" +
+                        "Şifre değiştirme işlemini onaylamak için doğrulama kodunuz:\n\n" +
+                        verificationCode + "\n\n" +
+                        "Not: Bu kod 10 dakika geçerlidir.\n" +
+                        "Eğer bu işlemi siz başlatmadıysanız hesabınızın şifresini hemen değiştirin.\n\n" +
+                        "SERRAVİT Ekibi",
+                null,
+                "Şifre değiştirme doğrulama e-postası"
+        );
+    }
+
     public void sendContactEmail(String fromName, String fromEmail, String subject, String messageBody) {
         sendEmail(
                 this.fromEmail,

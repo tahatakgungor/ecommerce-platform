@@ -34,6 +34,10 @@ public class User {
 
     private String passwordResetToken;
     private LocalDateTime passwordResetTokenExpiresAt;
+    private String passwordChangeVerificationCodeHash;
+    private LocalDateTime passwordChangeVerificationExpiresAt;
+    private String passwordChangePendingPasswordHash;
+    private Integer passwordChangeVerificationAttempts = 0;
     private String emailVerificationToken;
 
     // Mevcut kullanıcılar için DB default false — NULL'dan korunmak için columnDefinition

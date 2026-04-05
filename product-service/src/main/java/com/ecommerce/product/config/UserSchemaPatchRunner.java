@@ -35,7 +35,12 @@ public class UserSchemaPatchRunner implements CommandLineRunner {
         }
 
         executeSql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_expires_at TIMESTAMP");
-        log.info("User schema patch tamamlandı (password_reset_token_expires_at).");
+        executeSql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_change_verification_code_hash VARCHAR(255)");
+        executeSql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_change_verification_expires_at TIMESTAMP");
+        executeSql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_change_pending_password_hash VARCHAR(255)");
+        executeSql("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_change_verification_attempts INTEGER DEFAULT 0");
+        executeSql("UPDATE users SET password_change_verification_attempts = 0 WHERE password_change_verification_attempts IS NULL");
+        log.info("User schema patch tamamlandı (reset + change-password verification kolonları).");
     }
 
     private void executeSql(String sql) {

@@ -76,6 +76,28 @@ public class AuthController {
         return ApiResponse.ok("Şifreniz başarıyla güncellendi.", 1L);
     }
 
+    @PatchMapping("/change-password/request")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
+    public ApiResponse<String> requestChangePassword(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        authService.requestPasswordChangeVerification(
+                authentication.getName(),
+                request.get("oldPass"),
+                request.get("newPass")
+        );
+        return ApiResponse.ok("Doğrulama kodu e-posta adresinize gönderildi.", 1L);
+    }
+
+    @PatchMapping("/change-password/confirm")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
+    public ApiResponse<String> confirmChangePassword(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        authService.confirmPasswordChangeVerification(authentication.getName(), request.get("code"));
+        return ApiResponse.ok("Şifreniz başarıyla güncellendi.", 1L);
+    }
+
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         String clientIp = extractClientIp(httpRequest);

@@ -19,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 
 @Service
@@ -187,6 +188,66 @@ public class CustomerService {
     }
 
     @Transactional
+    public void requestPasswordChangeVerification(String email, String currentPassword, String newPassword) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new RuntimeException("Mevcut şifre hatalı!");
+        }
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 6) {
+            throw new RuntimeException("Yeni şifre en az 6 karakter olmalıdır!");
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new RuntimeException("Yeni şifre mevcut şifreyle aynı olamaz.");
+        }
+
+        String code = generateSixDigitCode();
+        user.setPasswordChangeVerificationCodeHash(hashToken(code));
+        user.setPasswordChangeVerificationExpiresAt(LocalDateTime.now().plusMinutes(10));
+        user.setPasswordChangePendingPasswordHash(passwordEncoder.encode(newPassword));
+        user.setPasswordChangeVerificationAttempts(0);
+        userRepository.save(user);
+
+        emailService.sendPasswordChangeVerificationEmail(user.getEmail(), code);
+    }
+
+    @Transactional
+    public void confirmPasswordChangeVerification(String email, String code) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+
+        if (user.getPasswordChangeVerificationCodeHash() == null
+                || user.getPasswordChangeVerificationExpiresAt() == null
+                || user.getPasswordChangePendingPasswordHash() == null) {
+            throw new RuntimeException("Aktif bir şifre değiştirme doğrulaması bulunamadı.");
+        }
+
+        if (user.getPasswordChangeVerificationExpiresAt().isBefore(LocalDateTime.now())) {
+            clearPasswordChangeVerification(user);
+            userRepository.save(user);
+            throw new RuntimeException("Doğrulama kodunun süresi doldu. Lütfen tekrar talep oluşturun.");
+        }
+
+        int attempts = user.getPasswordChangeVerificationAttempts() == null ? 0 : user.getPasswordChangeVerificationAttempts();
+        if (attempts >= 5) {
+            clearPasswordChangeVerification(user);
+            userRepository.save(user);
+            throw new RuntimeException("Çok fazla hatalı deneme yapıldı. Lütfen tekrar talep oluşturun.");
+        }
+
+        if (!hashToken(code).equals(user.getPasswordChangeVerificationCodeHash())) {
+            user.setPasswordChangeVerificationAttempts(attempts + 1);
+            userRepository.save(user);
+            throw new RuntimeException("Doğrulama kodu hatalı.");
+        }
+
+        user.setPassword(user.getPasswordChangePendingPasswordHash());
+        clearPasswordChangeVerification(user);
+        userRepository.save(user);
+    }
+
+    @Transactional
     public CustomerLoginResponse updateUser(String currentUserEmail, Map<String, String> updates) {
         User user = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
@@ -273,5 +334,16 @@ public class CustomerService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("Token hash algoritması bulunamadı", e);
         }
+    }
+
+    private String generateSixDigitCode() {
+        return String.format("%06d", ThreadLocalRandom.current().nextInt(100000, 1000000));
+    }
+
+    private void clearPasswordChangeVerification(User user) {
+        user.setPasswordChangeVerificationCodeHash(null);
+        user.setPasswordChangeVerificationExpiresAt(null);
+        user.setPasswordChangePendingPasswordHash(null);
+        user.setPasswordChangeVerificationAttempts(0);
     }
 }

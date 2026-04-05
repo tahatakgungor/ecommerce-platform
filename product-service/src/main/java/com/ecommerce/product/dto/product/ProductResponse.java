@@ -2,6 +2,7 @@ package com.ecommerce.product.dto.product;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,6 +46,7 @@ public class ProductResponse {
     private List<String> tags;
     private List<String> relatedImages;
     private List<String> colors;
+    private LocalDateTime createdAt;
 
     // Frontend'in .name okuyabilmesi için iç sınıflar
     @Data

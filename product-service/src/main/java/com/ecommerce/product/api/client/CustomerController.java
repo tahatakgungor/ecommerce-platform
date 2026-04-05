@@ -172,6 +172,30 @@ public class CustomerController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/change-password/request")
+    public ResponseEntity<ApiResponse<String>> requestChangePassword(
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        customerService.requestPasswordChangeVerification(
+                auth.getName(),
+                body.get("currentPassword"),
+                body.get("newPassword")
+        );
+        ApiResponse<String> response = new ApiResponse<>(true, null, null);
+        response.setMessage("Doğrulama kodu e-posta adresinize gönderildi.");
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/change-password/confirm")
+    public ResponseEntity<ApiResponse<String>> confirmChangePassword(
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        customerService.confirmPasswordChangeVerification(auth.getName(), body.get("code"));
+        ApiResponse<String> response = new ApiResponse<>(true, null, null);
+        response.setMessage("Şifreniz başarıyla güncellendi.");
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/update-user")
     public ResponseEntity<ApiResponse<CustomerLoginResponse>> updateUser(
             @RequestBody Map<String, String> body,

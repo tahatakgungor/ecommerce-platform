@@ -1,5 +1,6 @@
 package com.ecommerce.product.api.client;
 
+import com.ecommerce.product.application.ProductService;
 import com.ecommerce.product.domain.Product;
 import com.ecommerce.product.dto.product.ProductResponse;
 import com.ecommerce.product.repository.ProductRepository;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 public class ProductClientController {
 
     private final ProductRepository productRepository;
+    private final ProductService productService;
 
     // GET /api/products/show
     @GetMapping("/show")
@@ -49,6 +51,16 @@ public class ProductClientController {
         return Map.of("products", responses);
     }
 
+    // GET /api/products/popular?type=top-rated|best-selling|latest&limit=8
+    @GetMapping("/popular")
+    public Map<String, Object> getPopularProducts(
+            @RequestParam(defaultValue = "top-rated") String type,
+            @RequestParam(defaultValue = "8") Integer limit
+    ) {
+        List<ProductResponse> products = productService.findPopularProducts(type, limit);
+        return Map.of("products", products);
+    }
+
     // GET /api/products/{id}  — admin controller'da da var, burada tekrar açmıyoruz
 
     private ProductResponse toResponse(Product p) {
@@ -76,6 +88,7 @@ public class ProductClientController {
                 .tags(p.getTags())
                 .relatedImages(p.getRelatedImages())
                 .colors(p.getColors())
+                .createdAt(p.getCreatedAt())
                 .build();
     }
 }

@@ -118,6 +118,7 @@ public class ProductController {
                 .tags(product.getTags())
                 .relatedImages(product.getRelatedImages())
                 .colors(product.getColors())
+                .createdAt(product.getCreatedAt())
                 .build();
     }
 

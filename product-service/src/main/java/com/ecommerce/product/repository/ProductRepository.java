@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     List<Product> findByStatus(String status);
+    List<Product> findByStatusOrderByCreatedAtDesc(String status);
 
     @Query("SELECT p FROM Product p WHERE p.price < p.originalPrice AND p.status = 'Active'")
     List<Product> findDiscountProducts();
