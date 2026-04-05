@@ -25,6 +25,10 @@ spring:
     jackson:
       serialization:
         write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:15MB}
+      max-request-size: ${MAX_REQUEST_SIZE:20MB}
 
 app:
   jwt:

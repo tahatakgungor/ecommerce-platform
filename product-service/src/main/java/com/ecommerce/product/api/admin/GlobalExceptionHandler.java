@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -35,6 +36,13 @@ public class GlobalExceptionHandler {
     public ApiResponse<String> handleMissingResource(Exception ex) {
         log.warn("Kaynak bulunamadı: {}", ex.getMessage());
         return ApiResponse.error("Kaynak bulunamadı.");
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ApiResponse<String> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+        log.warn("Dosya boyutu limiti aşıldı: {}", ex.getMessage());
+        return ApiResponse.error("Dosya boyutu limiti aşıldı. Lütfen daha küçük bir dosya yükleyin.");
     }
 
     // RuntimeException önce yakalanmalı (daha spesifik)
