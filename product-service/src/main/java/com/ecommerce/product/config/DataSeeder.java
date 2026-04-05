@@ -28,17 +28,35 @@ public class DataSeeder implements CommandLineRunner {
 
     @Value("${app.seed-data:false}")
     private boolean seedData;
+    @Value("${app.seed-data-reset-existing:false}")
+    private boolean seedDataResetExisting;
 
     @Override
     @Transactional
     public void run(String... args) {
         if (!seedData) return;
 
-        log.info(">>> Veri temizleme başlıyor (users/invitations korunuyor)...");
-        productRepository.deleteAll();
-        categoryRepository.deleteAll();
-        brandRepository.deleteAll();
-        log.info(">>> Tablolar temizlendi. Serravit verileri ekleniyor...");
+        long productCount = productRepository.count();
+        long categoryCount = categoryRepository.count();
+        long brandCount = brandRepository.count();
+        boolean hasExistingData = productCount > 0 || categoryCount > 0 || brandCount > 0;
+
+        if (hasExistingData && !seedDataResetExisting) {
+            log.warn(">>> Seed atlandı: mevcut veriler korunuyor. (products={}, categories={}, brands={})",
+                    productCount, categoryCount, brandCount);
+            log.warn(">>> Mevcut veriyi resetleyip seedlemek isterseniz app.seed-data-reset-existing=true yapın.");
+            return;
+        }
+
+        if (seedDataResetExisting) {
+            log.warn(">>> Seed reset modu aktif. Veri temizleme başlıyor (users/invitations korunuyor)...");
+            productRepository.deleteAll();
+            categoryRepository.deleteAll();
+            brandRepository.deleteAll();
+            log.warn(">>> Tablolar temizlendi. Serravit verileri ekleniyor...");
+        } else {
+            log.info(">>> Seed başlıyor. Veriler boş olduğu için ilk kurulum verisi eklenecek.");
+        }
 
         seedBrands();
         seedCategories();

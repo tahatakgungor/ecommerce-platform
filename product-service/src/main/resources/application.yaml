@@ -38,6 +38,7 @@ app:
   cors:
     allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:3000,http://localhost:3001}
   seed-data: ${SEED_DATA:false}
+  seed-data-reset-existing: ${SEED_DATA_RESET_EXISTING:false}
   seed-product-review-ratings: ${SEED_PRODUCT_REVIEW_RATINGS:false}
   seed-product-review-ratings-reset-existing: ${SEED_PRODUCT_REVIEW_RATINGS:false}
   seed-product-review-ratings-min-per-product: ${SEED_PRODUCT_REVIEW_RATINGS_MIN_PER_PRODUCT:18}
