@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record CustomerUserDto(
         @JsonProperty("_id") String id,
         String name,
+        String firstName,
+        String lastName,
         String email,
         String role,
         String phone,

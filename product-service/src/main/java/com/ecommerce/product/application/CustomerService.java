@@ -62,8 +62,12 @@ public class CustomerService {
     }
 
     private User createNewCustomerSignup(CustomerSignupRequest request, String normalizedEmail, String verificationToken) {
+        NameParts nameParts = normalizeNameFields(request.firstName(), request.lastName(), request.name());
         User user = new User();
-        user.setName(request.name());
+        user.setName(nameParts.fullName());
+        user.setFirstName(nameParts.firstName());
+        user.setLastName(nameParts.lastName());
+        user.setPhone(request.phone());
         user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setRole("Customer");
@@ -81,7 +85,13 @@ public class CustomerService {
             throw new RuntimeException("Bu email adresi zaten kullanımda!");
         }
 
-        user.setName(request.name());
+        NameParts nameParts = normalizeNameFields(request.firstName(), request.lastName(), request.name());
+        user.setName(nameParts.fullName());
+        user.setFirstName(nameParts.firstName());
+        user.setLastName(nameParts.lastName());
+        if (request.phone() != null) {
+            user.setPhone(request.phone());
+        }
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setEmailVerificationToken(verificationToken);
         user.setEmailVerified(false);
@@ -252,8 +262,21 @@ public class CustomerService {
         User user = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
-        if (updates.containsKey("name") && updates.get("name") != null) {
-            user.setName(updates.get("name"));
+        String nextFirstName = updates.get("firstName");
+        String nextLastName = updates.get("lastName");
+        String nextName = updates.get("name");
+
+        if ((nextFirstName != null && !nextFirstName.isBlank())
+                || (nextLastName != null && !nextLastName.isBlank())
+                || (nextName != null && !nextName.isBlank())) {
+            NameParts parts = normalizeNameFields(
+                    nextFirstName != null ? nextFirstName : user.getFirstName(),
+                    nextLastName != null ? nextLastName : user.getLastName(),
+                    nextName != null ? nextName : user.getName()
+            );
+            user.setFirstName(parts.firstName());
+            user.setLastName(parts.lastName());
+            user.setName(parts.fullName());
         }
         if (updates.containsKey("phone")) {
             user.setPhone(updates.get("phone"));
@@ -303,9 +326,12 @@ public class CustomerService {
     }
 
     private CustomerUserDto toDto(User user) {
+        NameParts parts = normalizeNameFields(user.getFirstName(), user.getLastName(), user.getName());
         return new CustomerUserDto(
                 user.getId().toString(),
-                user.getName(),
+                parts.fullName(),
+                parts.firstName(),
+                parts.lastName(),
                 user.getEmail(),
                 user.getRole(),
                 user.getPhone(),
@@ -346,4 +372,34 @@ public class CustomerService {
         user.setPasswordChangePendingPasswordHash(null);
         user.setPasswordChangeVerificationAttempts(0);
     }
+
+    private NameParts normalizeNameFields(String firstName, String lastName, String fullName) {
+        String cleanedFirst = clean(firstName);
+        String cleanedLast = clean(lastName);
+
+        if (!cleanedFirst.isBlank() || !cleanedLast.isBlank()) {
+            String merged = (cleanedFirst + " " + cleanedLast).trim();
+            return new NameParts(cleanedFirst, cleanedLast, merged);
+        }
+
+        String cleanedFull = clean(fullName);
+        if (cleanedFull.isBlank()) {
+            return new NameParts("", "", "");
+        }
+
+        String[] parts = cleanedFull.split("\\s+");
+        if (parts.length == 1) {
+            return new NameParts(parts[0], "", parts[0]);
+        }
+
+        String derivedFirst = parts[0];
+        String derivedLast = cleanedFull.substring(derivedFirst.length()).trim();
+        return new NameParts(derivedFirst, derivedLast, cleanedFull);
+    }
+
+    private String clean(String value) {
+        return value == null ? "" : value.trim().replaceAll("\\s+", " ");
+    }
+
+    private record NameParts(String firstName, String lastName, String fullName) {}
 }
