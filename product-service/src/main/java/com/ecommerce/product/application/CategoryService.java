@@ -41,6 +41,7 @@ public class CategoryService {
         category.setName(details.getName());
         category.setDescription(details.getDescription());
         category.setImage(details.getImage());
+        category.setChildren(details.getChildren());
         return categoryRepository.save(category);
     }
 

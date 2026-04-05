@@ -149,4 +149,28 @@ class ProductServiceTest {
         assertEquals("https://cdn.example.com/new-1.jpg", updated.getRelatedImages().get(0));
         assertEquals("https://cdn.example.com/new-2.jpg", updated.getRelatedImages().get(1));
     }
+
+    @Test
+    void update_whenCategoryFieldsProvided_shouldPersistChildCategory() {
+        UUID id = UUID.randomUUID();
+        Product existing = new Product();
+        existing.setId(id);
+        existing.setParentCategory("Eski Parent");
+        existing.setCategoryName("Eski Kategori");
+        existing.setChildCategory("Eski Child");
+
+        Product patch = new Product();
+        patch.setParentCategory("Tarım");
+        patch.setCategoryName("Diğer");
+        patch.setChildCategory("Diğer");
+
+        when(productRepository.findById(id)).thenReturn(Optional.of(existing));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Product updated = productService.update(id, patch);
+
+        assertEquals("Tarım", updated.getParentCategory());
+        assertEquals("Diğer", updated.getCategoryName());
+        assertEquals("Diğer", updated.getChildCategory());
+    }
 }

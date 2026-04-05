@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -61,6 +62,7 @@ class CategoryServiceTest {
         patch.setName("New");
         patch.setDescription("Açıklama");
         patch.setImage("image.png");
+        patch.setChildren(List.of("Gıda Takviyesi", "Kozmetik"));
 
         when(categoryRepository.findById(id)).thenReturn(Optional.of(existing));
         when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -73,6 +75,7 @@ class CategoryServiceTest {
         assertEquals("New", saved.getName());
         assertEquals("Açıklama", saved.getDescription());
         assertEquals("image.png", saved.getImage());
+        assertEquals(List.of("Gıda Takviyesi", "Kozmetik"), saved.getChildren());
     }
 
     @Test

@@ -54,6 +54,7 @@ public class ProductService {
         if (details.getImage() != null) existing.setImage(details.getImage());
         if (details.getStatus() != null) existing.setStatus(details.getStatus());
         if (details.getParentCategory() != null) existing.setParentCategory(details.getParentCategory());
+        if (details.getChildCategory() != null) existing.setChildCategory(details.getChildCategory());
         if (details.getCategoryName() != null) existing.setCategoryName(details.getCategoryName());
         if (details.getBrandName() != null) existing.setBrandName(details.getBrandName());
         if (details.getTags() != null) existing.setTags(details.getTags());
