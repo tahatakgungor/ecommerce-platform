@@ -1,5 +1,6 @@
 package com.ecommerce.product.domain;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -21,6 +22,7 @@ public class Brand {
     private String website;
     private String location;
     private String description;
+    @JsonAlias({"image", "img"})
     private String logo;
 
     // Frontend uyumluluğu için

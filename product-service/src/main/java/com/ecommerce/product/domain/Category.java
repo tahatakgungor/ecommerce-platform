@@ -23,6 +23,7 @@ public class Category {
     private String name;
 
     private String description;
+    @JsonAlias({"img"})
     private String image;
 
     @JsonProperty("_id")
@@ -40,4 +41,15 @@ public class Category {
     @CollectionTable(name = "category_children", joinColumns = @JoinColumn(name = "category_id"))
     @JsonProperty("children")
     private List<String> children = new ArrayList<>();
+
+    // Harri panel "img" anahtarını kullanıyor; geriye dönük uyumluluk için expose ediyoruz.
+    @JsonProperty("img")
+    public String getImg() {
+        return image;
+    }
+
+    @JsonProperty("img")
+    public void setImg(String img) {
+        this.image = img;
+    }
 }
