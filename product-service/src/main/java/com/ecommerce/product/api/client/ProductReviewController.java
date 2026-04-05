@@ -79,6 +79,16 @@ public class ProductReviewController {
         return ResponseEntity.ok(ApiResponse.ok(response, 1L));
     }
 
+    @DeleteMapping("/{reviewId}/me")
+    public ResponseEntity<ApiResponse<String>> deleteOwnReview(
+            @PathVariable UUID productId,
+            @PathVariable UUID reviewId,
+            Authentication authentication
+    ) {
+        productReviewService.deleteOwnReview(productId, reviewId, authentication.getName());
+        return ResponseEntity.ok(ApiResponse.ok("Değerlendirme silindi.", 1L));
+    }
+
     @PostMapping("/{reviewId}/vote")
     public ResponseEntity<ApiResponse<Map<String, Object>>> voteReview(
             @PathVariable UUID productId,

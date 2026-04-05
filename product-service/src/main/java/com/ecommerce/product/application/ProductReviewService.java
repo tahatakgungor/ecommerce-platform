@@ -79,6 +79,62 @@ public class ProductReviewService {
         return evaluateEligibility(productId, orderId, user);
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> getMyReviewOverview(String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
+
+        List<Order> orders = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId().toString())
+                .stream()
+                .filter(order -> isCompletedStatus(order.getStatus()))
+                .toList();
+
+        Map<UUID, Map<String, Object>> pendingByProduct = new LinkedHashMap<>();
+        for (Order order : orders) {
+            List<Map<String, Object>> cartItems = parseCartItems(order.getCart());
+            for (Map<String, Object> item : cartItems) {
+                UUID productId = extractProductIdFromCartItem(item);
+                if (productId == null) continue;
+                if (!pendingByProduct.containsKey(productId)) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("productId", productId);
+                    row.put("orderId", order.getId());
+                    row.put("orderStatus", order.getStatus());
+                    row.put("orderCreatedAt", order.getCreatedAt());
+                    row.put("title", trimNullable(item != null ? Objects.toString(item.get("title"), null) : null));
+                    row.put("image", trimNullable(item != null ? Objects.toString(item.get("image"), null) : null));
+                    pendingByProduct.put(productId, row);
+                }
+            }
+        }
+
+        List<ProductReview> myReviews = productReviewRepository.findByUserIdOrderByUpdatedAtDesc(user.getId());
+
+        Set<UUID> reviewedProductIds = new LinkedHashSet<>();
+        List<Map<String, Object>> reviewed = new ArrayList<>();
+        for (ProductReview review : myReviews) {
+            UUID productId = review.getProduct() != null ? review.getProduct().getId() : null;
+            if (productId == null) continue;
+            reviewedProductIds.add(productId);
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("review", toResponse(review));
+            row.put("productId", productId);
+            row.put("title", review.getProduct() != null ? review.getProduct().getName() : null);
+            row.put("image", review.getProduct() != null ? review.getProduct().getImage() : null);
+            reviewed.add(row);
+        }
+
+        for (UUID reviewedProductId : reviewedProductIds) {
+            pendingByProduct.remove(reviewedProductId);
+        }
+
+        return Map.of(
+                "reviewed", reviewed,
+                "pending", new ArrayList<>(pendingByProduct.values())
+        );
+    }
+
     @Transactional
     public String uploadReviewMedia(UUID productId, org.springframework.web.multipart.MultipartFile file, String userEmail) {
         ensureProductExists(productId);
@@ -125,6 +181,24 @@ public class ProductReviewService {
         review.setStatus(resolveInitialStatus(review)); // düzenleme sonrası tekrar moderasyon kuyruğu
 
         return toResponse(productReviewRepository.save(review));
+    }
+
+    @Transactional
+    @CacheEvict(cacheNames = "productReviewSummary", key = "#productId")
+    public void deleteOwnReview(UUID productId, UUID reviewId, String userEmail) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı."));
+
+        ProductReview review = productReviewRepository.findByIdAndProductId(reviewId, productId)
+                .orElseThrow(() -> new RuntimeException("Yorum bulunamadı."));
+
+        if (!review.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Sadece kendi yorumunuzu silebilirsiniz.");
+        }
+
+        feedbackRepository.deleteByReviewId(reviewId);
+        productReviewRepository.delete(review);
+        clearReviewedMarkForUserProduct(user.getId(), productId);
     }
 
     @Transactional(readOnly = true)
@@ -322,7 +396,7 @@ public class ProductReviewService {
     private boolean hasDeliveredPurchase(UUID userId, UUID productId) {
         return orderRepository.findByUserIdOrderByCreatedAtDesc(userId.toString())
                 .stream()
-                .filter(order -> "delivered".equalsIgnoreCase(trimNullable(order.getStatus())))
+                .filter(order -> isCompletedStatus(order.getStatus()))
                 .map(Order::getCart)
                 .filter(Objects::nonNull)
                 .flatMap(cart -> parseCartItems(cart).stream())
@@ -334,13 +408,13 @@ public class ProductReviewService {
         if (orderId != null) {
             return orderRepository.findById(orderId)
                     .filter(order -> userId.toString().equals(order.getUserId()))
-                    .filter(order -> "delivered".equalsIgnoreCase(trimNullable(order.getStatus())))
+                    .filter(order -> isCompletedStatus(order.getStatus()))
                     .filter(order -> cartContainsProduct(order, productId));
         }
 
         return orderRepository.findByUserIdOrderByCreatedAtDesc(userId.toString())
                 .stream()
-                .filter(order -> "delivered".equalsIgnoreCase(trimNullable(order.getStatus())))
+                .filter(order -> isCompletedStatus(order.getStatus()))
                 .filter(order -> cartContainsProduct(order, productId))
                 .findFirst();
     }
@@ -392,6 +466,29 @@ public class ProductReviewService {
         }
     }
 
+    private void clearReviewedMarkForUserProduct(UUID userId, UUID productId) {
+        if (userId == null || productId == null) return;
+
+        List<Order> orders = orderRepository.findByUserIdOrderByCreatedAtDesc(userId.toString())
+                .stream()
+                .filter(order -> isCompletedStatus(order.getStatus()))
+                .filter(order -> cartContainsProduct(order, productId))
+                .toList();
+
+        for (Order order : orders) {
+            Set<UUID> reviewed = new LinkedHashSet<>(parseReviewedProductIds(order));
+            if (!reviewed.remove(productId)) continue;
+
+            try {
+                List<String> serialized = reviewed.stream().map(UUID::toString).toList();
+                order.setReviewedProducts(objectMapper.writeValueAsString(serialized));
+                orderRepository.save(order);
+            } catch (Exception ignored) {
+                // İşaretleme temizleme hatası kullanıcı akışını bozmasın.
+            }
+        }
+    }
+
     private ReviewEligibilityResponse evaluateEligibility(UUID productId, UUID orderId, User user) {
         if (!isCustomerRole(user.getRole())) {
             return ReviewEligibilityResponse.builder()
@@ -437,6 +534,12 @@ public class ProductReviewService {
         if (normalized == null) return false;
         String upper = normalized.toUpperCase(Locale.ROOT);
         return "CUSTOMER".equals(upper) || "ROLE_CUSTOMER".equals(upper) || "USER".equals(upper) || "ROLE_USER".equals(upper);
+    }
+
+    private boolean isCompletedStatus(String status) {
+        String normalized = trimNullable(status);
+        if (normalized == null) return false;
+        return "delivered".equalsIgnoreCase(normalized) || "completed".equalsIgnoreCase(normalized);
     }
 
     private List<Map<String, Object>> parseCartItems(String cartJson) {
@@ -515,10 +618,7 @@ public class ProductReviewService {
             throw new RuntimeException("Puan 1 ile 5 arasında olmalıdır.");
         }
         String commentBody = trimNullable(request.getCommentBody());
-        if (commentBody == null || commentBody.length() < 5) {
-            throw new RuntimeException("Yorum metni en az 5 karakter olmalıdır.");
-        }
-        if (commentBody.length() > 2000) {
+        if (commentBody != null && commentBody.length() > 2000) {
             throw new RuntimeException("Yorum metni en fazla 2000 karakter olabilir.");
         }
         String title = trimNullable(request.getCommentTitle());
@@ -533,10 +633,7 @@ public class ProductReviewService {
             throw new RuntimeException("Puan 1 ile 5 arasında olmalıdır.");
         }
         String commentBody = trimNullable(request.getCommentBody());
-        if (commentBody == null || commentBody.length() < 5) {
-            throw new RuntimeException("Yorum metni en az 5 karakter olmalıdır.");
-        }
-        if (commentBody.length() > 2000) {
+        if (commentBody != null && commentBody.length() > 2000) {
             throw new RuntimeException("Yorum metni en fazla 2000 karakter olabilir.");
         }
         String title = trimNullable(request.getCommentTitle());

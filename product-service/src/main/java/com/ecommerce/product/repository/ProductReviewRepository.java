@@ -18,6 +18,8 @@ public interface ProductReviewRepository extends JpaRepository<ProductReview, UU
 
     Optional<ProductReview> findByIdAndProductId(UUID reviewId, UUID productId);
 
+    List<ProductReview> findByUserIdOrderByUpdatedAtDesc(UUID userId);
+
     List<ProductReview> findByProductId(UUID productId);
 
     Page<ProductReview> findByProductIdAndStatus(UUID productId, ReviewStatus status, Pageable pageable);
