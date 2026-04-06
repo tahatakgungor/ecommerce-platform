@@ -31,6 +31,8 @@ spring:
       max-request-size: ${MAX_REQUEST_SIZE:20MB}
 
 app:
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
   jwt:
     secret: ${JWT_SECRET:local-dev-secret-key-must-be-at-least-32-chars}
   frontend-url: ${FRONTEND_URL:http://localhost:3000}
