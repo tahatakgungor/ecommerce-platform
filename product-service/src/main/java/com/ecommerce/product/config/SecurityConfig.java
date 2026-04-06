@@ -108,6 +108,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/products/discount").permitAll()
                         .requestMatchers("/api/products/relatedProduct").permitAll()
                         .requestMatchers("/api/banners/show").permitAll()
+                        .requestMatchers("/api/blog").permitAll()
+                        .requestMatchers("/api/blog/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/*/reviews").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/*/reviews/summary").permitAll()
                         .requestMatchers("/api/category/show").permitAll()
