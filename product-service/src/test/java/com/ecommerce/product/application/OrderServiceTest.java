@@ -9,16 +9,20 @@ import com.ecommerce.product.repository.OrderRepository;
 import com.ecommerce.product.repository.ProductRepository;
 import com.ecommerce.product.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.iyzipay.Options;
+import com.iyzipay.model.CheckoutForm;
+import com.iyzipay.request.RetrieveCheckoutFormRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
+import java.math.BigDecimal;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,25 +30,17 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
-    @Mock
-    private OrderRepository orderRepository;
+    @Mock private OrderRepository orderRepository;
+    @Mock private UserRepository userRepository;
+    @Mock private ProductRepository productRepository;
+    @Mock private CouponRepository couponRepository;
+    @Mock private Options iyzicoOptions;
 
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private ProductRepository productRepository;
-
-    @Mock
-    private CouponRepository couponRepository;
-
-    @InjectMocks
     private OrderService orderService;
 
     @BeforeEach
@@ -54,12 +50,13 @@ class OrderServiceTest {
                 userRepository,
                 productRepository,
                 couponRepository,
-                new ObjectMapper()
+                new ObjectMapper(),
+                iyzicoOptions
         );
     }
 
     @Test
-    void addOrder_withAssignedUserCoupon_shouldApplyDiscountAndPersistCouponInfo() {
+    void confirmPayment_withAssignedUserCoupon_shouldApplyDiscountAndPersistCouponInfo() {
         UUID userId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
 
@@ -88,6 +85,8 @@ class OrderServiceTest {
         coupon.setEndTime("2099-12-31T23:59:59+03:00");
 
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("token", "iyzico-test-token");
+        body.put("conversationId", "test-conversation-id");
         body.put("name", "Customer");
         body.put("address", "Address 1");
         body.put("contact", "5551234567");
@@ -103,33 +102,48 @@ class OrderServiceTest {
         when(userRepository.findByEmail("customer@mail.com")).thenReturn(Optional.of(user));
         when(productRepository.findById(productId)).thenReturn(Optional.of(product));
         when(couponRepository.findByCouponCodeIgnoreCase("VIP20")).thenReturn(Optional.of(coupon));
+        when(orderRepository.findByIyzicoToken("iyzico-test-token")).thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setId(UUID.randomUUID());
             return order;
         });
 
-        Map<String, Object> result = orderService.addOrder(body, "customer@mail.com");
-        @SuppressWarnings("unchecked")
-        Map<String, Object> orderMap = (Map<String, Object>) result.get("order");
+        CheckoutForm mockForm = mock(CheckoutForm.class);
+        when(mockForm.getStatus()).thenReturn("success");
+        when(mockForm.getPaymentStatus()).thenReturn("SUCCESS");
+        when(mockForm.getPaymentId()).thenReturn("PAY123");
+        when(mockForm.getConversationId()).thenReturn("test-conversation-id");
+        when(mockForm.getPrice()).thenReturn(new BigDecimal("430.00"));
+        when(mockForm.getPaidPrice()).thenReturn(new BigDecimal("350.00"));
 
-        assertEquals(true, result.get("success"));
-        assertEquals("VIP20", orderMap.get("couponCode"));
-        assertEquals("VIP 20", orderMap.get("couponTitle"));
-        assertEquals(400.0, orderMap.get("subTotal"));
-        assertEquals(80.0, orderMap.get("discount"));
-        assertEquals(350.0, orderMap.get("totalAmount"));
+        try (MockedStatic<CheckoutForm> mockedForm = mockStatic(CheckoutForm.class)) {
+            mockedForm.when(() -> CheckoutForm.retrieve(any(RetrieveCheckoutFormRequest.class), any(Options.class)))
+                    .thenReturn(mockForm);
 
-        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
-        verify(orderRepository).save(captor.capture());
-        Order savedOrder = captor.getValue();
-        assertEquals("VIP20", savedOrder.getCouponCode());
-        assertEquals("VIP 20", savedOrder.getCouponTitle());
-        assertEquals(80.0, savedOrder.getDiscount());
+            Map<String, Object> result = orderService.confirmPayment(body, "customer@mail.com");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> orderMap = (Map<String, Object>) result.get("order");
+
+            assertEquals(true, result.get("success"));
+            assertEquals("VIP20", orderMap.get("couponCode"));
+            assertEquals("VIP 20", orderMap.get("couponTitle"));
+            assertEquals(400.0, orderMap.get("subTotal"));
+            assertEquals(80.0, orderMap.get("discount"));
+            assertEquals(350.0, orderMap.get("totalAmount"));
+
+            ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+            verify(orderRepository).save(captor.capture());
+            Order savedOrder = captor.getValue();
+            assertEquals("VIP20", savedOrder.getCouponCode());
+            assertEquals("VIP 20", savedOrder.getCouponTitle());
+            assertEquals(80.0, savedOrder.getDiscount());
+        }
     }
 
     @Test
-    void addOrder_withCouponAssignedToAnotherUser_shouldThrow() {
+    void confirmPayment_withCouponAssignedToAnotherUser_shouldThrow() {
         UUID userId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
 
@@ -158,6 +172,8 @@ class OrderServiceTest {
         coupon.setEndTime("2099-12-31T23:59:59+03:00");
 
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("token", "iyzico-test-token-2");
+        body.put("conversationId", "test-conv-2");
         body.put("name", "Another Customer");
         body.put("address", "Address 2");
         body.put("contact", "5550000000");
@@ -170,10 +186,25 @@ class OrderServiceTest {
         body.put("couponCode", "VIP20");
         body.put("cart", List.of(Map.of("_id", productId.toString(), "orderQuantity", 1)));
 
+        when(orderRepository.findByIyzicoToken("iyzico-test-token-2")).thenReturn(Optional.empty());
         when(userRepository.findByEmail("another@mail.com")).thenReturn(Optional.of(user));
         when(couponRepository.findByCouponCodeIgnoreCase("VIP20")).thenReturn(Optional.of(coupon));
 
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> orderService.addOrder(body, "another@mail.com"));
-        assertEquals("Bu kupon yalnızca atanmış müşteri hesabında kullanılabilir.", ex.getMessage());
+        CheckoutForm mockForm = mock(CheckoutForm.class);
+        when(mockForm.getStatus()).thenReturn("success");
+        when(mockForm.getPaymentStatus()).thenReturn("SUCCESS");
+        when(mockForm.getPaymentId()).thenReturn("PAY456");
+        when(mockForm.getConversationId()).thenReturn("test-conv-2");
+        when(mockForm.getPrice()).thenReturn(new BigDecimal("230.00"));
+        when(mockForm.getPaidPrice()).thenReturn(new BigDecimal("230.00"));
+
+        try (MockedStatic<CheckoutForm> mockedForm = mockStatic(CheckoutForm.class)) {
+            mockedForm.when(() -> CheckoutForm.retrieve(any(RetrieveCheckoutFormRequest.class), any(Options.class)))
+                    .thenReturn(mockForm);
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> orderService.confirmPayment(body, "another@mail.com"));
+            assertEquals("Bu kupon yalnızca atanmış müşteri hesabında kullanılabilir.", ex.getMessage());
+        }
     }
 }
