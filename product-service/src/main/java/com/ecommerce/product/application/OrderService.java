@@ -10,16 +10,20 @@ import com.ecommerce.product.repository.ProductRepository;
 import com.ecommerce.product.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.stripe.Stripe;
-import com.stripe.model.PaymentIntent;
-import com.stripe.param.PaymentIntentCreateParams;
-import jakarta.annotation.PostConstruct;
+import com.iyzipay.Options;
+import com.iyzipay.model.*;
+import com.iyzipay.model.Currency;
+import com.iyzipay.request.CreateCheckoutFormInitializeRequest;
+import com.iyzipay.request.RetrieveCheckoutFormRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -37,55 +41,136 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final CouponRepository couponRepository;
     private final ObjectMapper objectMapper;
+    private final Options iyzicoOptions;
 
-    @Value("${app.stripe.secret-key:}")
-    private String stripeSecretKey;
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
-    @PostConstruct
-    public void init() {
-        if (stripeSecretKey != null && !stripeSecretKey.isBlank()) {
-            Stripe.apiKey = stripeSecretKey;
-        }
-    }
+    // ---------- iyzico: Ödeme başlat ----------
 
-    // ---------- Stripe: Payment Intent ----------
-
-    public Map<String, Object> createPaymentIntent(Map<String, Object> body, String email) {
-        CheckoutSummary checkoutSummary = calculateCheckout(body, email);
-        long amountInKurus = Math.round(checkoutSummary.totalAmount() * 100.0);
-        try {
-            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
-                    .setAmount(amountInKurus)
-                    .setCurrency("try")
-                    .setAutomaticPaymentMethods(
-                            PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
-                                    .setEnabled(true)
-                                    .build()
-                    )
-                    .build();
-            PaymentIntent intent = PaymentIntent.create(params);
-            return Map.of(
-                    "clientSecret", intent.getClientSecret(),
-                    "subTotal", formatAmount(checkoutSummary.subTotal()),
-                    "shippingCost", formatAmount(checkoutSummary.shippingCost()),
-                    "discount", formatAmount(checkoutSummary.discountAmount()),
-                    "totalAmount", formatAmount(checkoutSummary.totalAmount())
-            );
-        } catch (Exception e) {
-            log.error("Stripe PaymentIntent oluşturulamadı: {}", e.getMessage());
-            throw new RuntimeException("Ödeme başlatılamadı: " + e.getMessage());
-        }
-    }
-
-    // ---------- Sipariş kaydet ----------
-
-    @Transactional
-    public Map<String, Object> addOrder(Map<String, Object> body, String email) {
+    public Map<String, Object> initializePayment(Map<String, Object> body, String email, HttpServletRequest httpRequest) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
-        CheckoutSummary checkoutSummary = calculateCheckout(body, email);
-        Order order = new Order();
+        CheckoutSummary cs = calculateCheckout(body, email);
 
+        String conversationId = UUID.randomUUID().toString();
+
+        CreateCheckoutFormInitializeRequest request = new CreateCheckoutFormInitializeRequest();
+        request.setLocale(Locale.TR.getValue());
+        request.setConversationId(conversationId);
+        request.setPrice(bigDecimal(cs.subTotal() + cs.shippingCost()));
+        request.setPaidPrice(bigDecimal(cs.totalAmount()));
+        request.setCurrency(Currency.TRY.name());
+        request.setBasketId("BASKET-" + conversationId);
+        request.setPaymentGroup(PaymentGroup.PRODUCT.getValue());
+        request.setCallbackUrl(frontendUrl + "/api/payment-callback");
+
+        Buyer buyer = new Buyer();
+        buyer.setId(user.getId().toString());
+        buyer.setName(user.getFirstName() != null ? user.getFirstName() : "Müşteri");
+        buyer.setSurname(user.getLastName() != null ? user.getLastName() : "-");
+        buyer.setEmail(user.getEmail());
+        buyer.setIdentityNumber("11111111111");
+        String addr = str(body, "address") != null ? str(body, "address") : "Belirtilmedi";
+        String city = str(body, "city") != null ? str(body, "city") : "Istanbul";
+        String country = str(body, "country") != null ? str(body, "country") : "Turkey";
+        buyer.setRegistrationAddress(addr + ", " + city);
+        buyer.setCity(city);
+        buyer.setCountry(country);
+        String clientIp = httpRequest.getHeader("X-Forwarded-For");
+        if (clientIp == null || clientIp.isBlank()) clientIp = httpRequest.getRemoteAddr();
+        buyer.setIp(clientIp != null ? clientIp.split(",")[0].trim() : "127.0.0.1");
+        request.setBuyer(buyer);
+
+        Address address = new Address();
+        address.setContactName(str(body, "name") != null ? str(body, "name") : buyer.getName() + " " + buyer.getSurname());
+        address.setCity(city);
+        address.setCountry(country);
+        address.setAddress(addr);
+        request.setShippingAddress(address);
+        request.setBillingAddress(address);
+
+        List<BasketItem> basketItems = new ArrayList<>();
+        for (Map<String, Object> item : cs.sanitizedCart()) {
+            BasketItem bi = new BasketItem();
+            bi.setId(str(item, "_id"));
+            bi.setName(str(item, "title"));
+            bi.setCategory1(str(item, "parent") != null ? str(item, "parent") : "Genel");
+            bi.setItemType(BasketItemType.PHYSICAL.name());
+            double price = toDouble(item.get("price"));
+            int qty = item.get("orderQuantity") instanceof Number
+                    ? ((Number) item.get("orderQuantity")).intValue()
+                    : Integer.parseInt(item.get("orderQuantity").toString());
+            bi.setPrice(bigDecimal(price * qty));
+            basketItems.add(bi);
+        }
+        if (cs.shippingCost() > 0) {
+            BasketItem shipping = new BasketItem();
+            shipping.setId("SHIPPING");
+            shipping.setName("Kargo");
+            shipping.setCategory1("Kargo");
+            shipping.setItemType(BasketItemType.PHYSICAL.name());
+            shipping.setPrice(bigDecimal(cs.shippingCost()));
+            basketItems.add(shipping);
+        }
+        request.setBasketItems(basketItems);
+
+        CheckoutFormInitialize result = CheckoutFormInitialize.create(request, iyzicoOptions);
+
+        if (!"success".equals(result.getStatus())) {
+            log.error("iyzico init failed [{}]: {}", result.getErrorCode(), result.getErrorMessage());
+            throw new RuntimeException("Ödeme başlatılamadı: " + result.getErrorMessage());
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("checkoutFormContent", result.getCheckoutFormContent());
+        response.put("token", result.getToken());
+        response.put("conversationId", conversationId);
+        response.put("subTotal", formatAmount(cs.subTotal()));
+        response.put("shippingCost", formatAmount(cs.shippingCost()));
+        response.put("discount", formatAmount(cs.discountAmount()));
+        response.put("totalAmount", formatAmount(cs.totalAmount()));
+        return response;
+    }
+
+    // ---------- iyzico: Ödeme doğrula ve siparişi kaydet ----------
+
+    @Transactional
+    public Map<String, Object> confirmPayment(Map<String, Object> body, String email) {
+        String token = str(body, "token");
+        if (token == null || token.isBlank()) {
+            throw new RuntimeException("Ödeme token'ı eksik.");
+        }
+
+        // Idempotency: aynı token ile tekrar sipariş oluşturma
+        Optional<Order> existing = orderRepository.findByIyzicoToken(token);
+        if (existing.isPresent()) {
+            Order ex = existing.get();
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("success", true);
+            resp.put("orderId", ex.getId().toString());
+            resp.put("order", toResponse(ex));
+            return resp;
+        }
+
+        RetrieveCheckoutFormRequest retrieveRequest = new RetrieveCheckoutFormRequest();
+        retrieveRequest.setLocale(Locale.TR.getValue());
+        retrieveRequest.setConversationId(str(body, "conversationId"));
+        retrieveRequest.setToken(token);
+
+        CheckoutForm checkoutForm = CheckoutForm.retrieve(retrieveRequest, iyzicoOptions);
+
+        if (!"success".equals(checkoutForm.getStatus()) || !"SUCCESS".equals(checkoutForm.getPaymentStatus())) {
+            log.error("iyzico payment failed [{}]: {}", checkoutForm.getErrorCode(), checkoutForm.getErrorMessage());
+            throw new RuntimeException("Ödeme doğrulanamadı: " +
+                    (checkoutForm.getErrorMessage() != null ? checkoutForm.getErrorMessage() : checkoutForm.getPaymentStatus()));
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+        CheckoutSummary cs = calculateCheckout(body, email);
+
+        Order order = new Order();
         order.setName(str(body, "name"));
         order.setAddress(str(body, "address"));
         order.setContact(str(body, "contact"));
@@ -97,20 +182,32 @@ public class OrderService {
         order.setStatus("pending");
         order.setUserId(user.getId().toString());
 
-        order.setSubTotal(checkoutSummary.subTotal());
-        order.setShippingCost(checkoutSummary.shippingCost());
-        order.setDiscount(checkoutSummary.discountAmount());
-        order.setTotalAmount(checkoutSummary.totalAmount());
-        order.setCouponCode(checkoutSummary.couponCode());
-        order.setCouponTitle(checkoutSummary.couponTitle());
+        order.setSubTotal(cs.subTotal());
+        order.setShippingCost(cs.shippingCost());
+        order.setDiscount(cs.discountAmount());
+        order.setTotalAmount(cs.totalAmount());
+        order.setCouponCode(cs.couponCode());
+        order.setCouponTitle(cs.couponTitle());
 
-        // Cart, cardInfo, paymentIntent → JSON string olarak sakla
-        order.setCart(toJson(checkoutSummary.sanitizedCart()));
-        order.setCardInfo(toJson(body.get("cardInfo")));
-        order.setPaymentIntent(toJson(body.get("paymentIntent")));
+        order.setCart(toJson(cs.sanitizedCart()));
+        order.setIyzicoToken(token);
+        order.setIyzicoConversationId(checkoutForm.getConversationId());
+        order.setIyzicoPaymentId(checkoutForm.getPaymentId());
+        order.setIyzicoPaymentDetail(toJson(Map.of(
+                "paymentId", checkoutForm.getPaymentId() != null ? checkoutForm.getPaymentId() : "",
+                "conversationId", checkoutForm.getConversationId() != null ? checkoutForm.getConversationId() : "",
+                "paymentStatus", checkoutForm.getPaymentStatus() != null ? checkoutForm.getPaymentStatus() : "",
+                "price", checkoutForm.getPrice() != null ? checkoutForm.getPrice().toString() : "",
+                "paidPrice", checkoutForm.getPaidPrice() != null ? checkoutForm.getPaidPrice().toString() : ""
+        )));
 
         Order saved = orderRepository.save(order);
-        return Map.of("success", true, "order", toResponse(saved));
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("orderId", saved.getId().toString());
+        response.put("order", toResponse(saved));
+        return response;
     }
 
     // ---------- Kullanıcının siparişleri ----------
@@ -196,8 +293,9 @@ public class OrderService {
         map.put("createdAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
         map.put("cart", fromJson(o.getCart()));
         map.put("reviewedProducts", fromJson(o.getReviewedProducts()));
-        map.put("cardInfo", fromJson(o.getCardInfo()));
-        map.put("paymentIntent", fromJson(o.getPaymentIntent()));
+        map.put("iyzicoToken", o.getIyzicoToken());
+        map.put("iyzicoPaymentId", o.getIyzicoPaymentId());
+        map.put("iyzicoConversationId", o.getIyzicoConversationId());
         return map;
     }
 
@@ -436,6 +534,10 @@ public class OrderService {
 
     private double formatAmount(double amount) {
         return Math.round(amount * 100.0) / 100.0;
+    }
+
+    private BigDecimal bigDecimal(double amount) {
+        return BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP);
     }
 
     private record CheckoutSummary(

@@ -2,6 +2,7 @@ package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.application.OrderService;
 import com.ecommerce.product.dto.ApiResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -26,17 +27,20 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, result, (Long) result.get("total")));
     }
 
-    // Müşteri: sipariş oluştur (ödeme sonrası)
-    @PostMapping("/addOrder")
-    public ResponseEntity<?> addOrder(@RequestBody Map<String, Object> body, Authentication auth) {
-        Map<String, Object> result = orderService.addOrder(body, auth.getName());
+    // iyzico: ödeme formu başlat
+    @PostMapping("/initialize-payment")
+    public ResponseEntity<?> initializePayment(
+            @RequestBody Map<String, Object> body,
+            Authentication auth,
+            HttpServletRequest request) {
+        Map<String, Object> result = orderService.initializePayment(body, auth.getName(), request);
         return ResponseEntity.ok(result);
     }
 
-    // Stripe: payment intent oluştur
-    @PostMapping("/create-payment-intent")
-    public ResponseEntity<?> createPaymentIntent(@RequestBody Map<String, Object> body, Authentication auth) {
-        Map<String, Object> result = orderService.createPaymentIntent(body, auth.getName());
+    // iyzico: ödeme doğrula ve siparişi kaydet
+    @PostMapping("/confirm-payment")
+    public ResponseEntity<?> confirmPayment(@RequestBody Map<String, Object> body, Authentication auth) {
+        Map<String, Object> result = orderService.confirmPayment(body, auth.getName());
         return ResponseEntity.ok(result);
     }
 

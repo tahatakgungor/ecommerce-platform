@@ -44,13 +44,15 @@ public class Order {
     private String couponCode;
     private String couponTitle;
 
-    // Stripe PaymentMethod JSON
-    @Column(columnDefinition = "TEXT")
-    private String cardInfo;
+    // iyzico ödeme alanları
+    @Column(unique = true)
+    private String iyzicoToken;
 
-    // Stripe PaymentIntent JSON
+    private String iyzicoConversationId;
+    private String iyzicoPaymentId;
+
     @Column(columnDefinition = "TEXT")
-    private String paymentIntent;
+    private String iyzicoPaymentDetail;
 
     // Sipariş bazlı değerlendirilen ürün ID listesi (JSON array)
     @Column(columnDefinition = "TEXT")

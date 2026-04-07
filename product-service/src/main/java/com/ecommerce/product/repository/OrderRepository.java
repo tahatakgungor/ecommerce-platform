@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface OrderRepository extends JpaRepository<Order, UUID> {
@@ -13,4 +14,5 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByCreatedAtAfter(LocalDateTime date);
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByStatusIgnoreCase(String status);
+    Optional<Order> findByIyzicoToken(String iyzicoToken);
 }

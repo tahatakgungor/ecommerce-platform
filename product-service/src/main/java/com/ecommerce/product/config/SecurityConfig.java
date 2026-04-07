@@ -62,7 +62,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives(
-                                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+                                "default-src 'none'; frame-ancestors 'self' https://*.iyzipay.com; base-uri 'none'; form-action 'self'"
                         ))
                         .referrerPolicy(referrer -> referrer
                                 .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
