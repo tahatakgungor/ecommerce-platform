@@ -11,8 +11,14 @@ import com.ecommerce.product.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.iyzipay.Options;
-import com.iyzipay.model.*;
+import com.iyzipay.model.Address;
+import com.iyzipay.model.BasketItem;
+import com.iyzipay.model.BasketItemType;
+import com.iyzipay.model.Buyer;
+import com.iyzipay.model.CheckoutForm;
+import com.iyzipay.model.CheckoutFormInitialize;
 import com.iyzipay.model.Currency;
+import com.iyzipay.model.PaymentGroup;
 import com.iyzipay.request.CreateCheckoutFormInitializeRequest;
 import com.iyzipay.request.RetrieveCheckoutFormRequest;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.Locale;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
@@ -56,13 +63,13 @@ public class OrderService {
         String conversationId = UUID.randomUUID().toString();
 
         CreateCheckoutFormInitializeRequest request = new CreateCheckoutFormInitializeRequest();
-        request.setLocale(Locale.TR.getValue());
+        request.setLocale("tr");
         request.setConversationId(conversationId);
         request.setPrice(bigDecimal(cs.subTotal() + cs.shippingCost()));
         request.setPaidPrice(bigDecimal(cs.totalAmount()));
         request.setCurrency(Currency.TRY.name());
         request.setBasketId("BASKET-" + conversationId);
-        request.setPaymentGroup(PaymentGroup.PRODUCT.getValue());
+        request.setPaymentGroup(PaymentGroup.PRODUCT.name());
         request.setCallbackUrl(frontendUrl + "/api/payment-callback");
 
         Buyer buyer = new Buyer();
@@ -154,7 +161,7 @@ public class OrderService {
         }
 
         RetrieveCheckoutFormRequest retrieveRequest = new RetrieveCheckoutFormRequest();
-        retrieveRequest.setLocale(Locale.TR.getValue());
+        retrieveRequest.setLocale("tr");
         retrieveRequest.setConversationId(str(body, "conversationId"));
         retrieveRequest.setToken(token);
 
