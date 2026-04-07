@@ -87,6 +87,8 @@ public class OrderService {
         String clientIp = httpRequest.getHeader("X-Forwarded-For");
         if (clientIp == null || clientIp.isBlank()) clientIp = httpRequest.getRemoteAddr();
         buyer.setIp(clientIp != null ? clientIp.split(",")[0].trim() : "127.0.0.1");
+        String phone = str(body, "contact");
+        buyer.setGsmNumber(phone != null && !phone.isBlank() ? phone : "+905555555555");
         request.setBuyer(buyer);
 
         Address address = new Address();
