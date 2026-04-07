@@ -207,4 +207,28 @@ class OrderServiceTest {
             assertEquals("Bu kupon yalnızca atanmış müşteri hesabında kullanılabilir.", ex.getMessage());
         }
     }
+
+    @Test
+    void confirmPayment_withConversationIdMismatch_shouldThrow() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("token", "iyzico-test-token-mismatch");
+        body.put("conversationId", "expected-conv-id");
+        body.put("cart", List.of()); // Just to bypass early null checks if any, though token comes first.
+
+        when(orderRepository.findByIyzicoToken("iyzico-test-token-mismatch")).thenReturn(Optional.empty());
+
+        CheckoutForm mockForm = mock(CheckoutForm.class);
+        when(mockForm.getStatus()).thenReturn("success");
+        when(mockForm.getPaymentStatus()).thenReturn("SUCCESS");
+        when(mockForm.getConversationId()).thenReturn("different-conv-id"); // Mismatch here
+
+        try (MockedStatic<CheckoutForm> mockedForm = mockStatic(CheckoutForm.class)) {
+            mockedForm.when(() -> CheckoutForm.retrieve(any(RetrieveCheckoutFormRequest.class), any(Options.class)))
+                    .thenReturn(mockForm);
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> orderService.confirmPayment(body, "test@mail.com"));
+            assertEquals("Ödeme doğrulanamadı: Güvenlik ihlali (Geçersiz ConversationId).", ex.getMessage());
+        }
+    }
 }

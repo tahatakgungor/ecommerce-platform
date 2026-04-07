@@ -160,18 +160,28 @@ public class OrderService {
             return resp;
         }
 
+        String conversationId = str(body, "conversationId");
         RetrieveCheckoutFormRequest retrieveRequest = new RetrieveCheckoutFormRequest();
         retrieveRequest.setLocale("tr");
-        retrieveRequest.setConversationId(str(body, "conversationId"));
+        retrieveRequest.setConversationId(conversationId);
         retrieveRequest.setToken(token);
 
         CheckoutForm checkoutForm = CheckoutForm.retrieve(retrieveRequest, iyzicoOptions);
 
         if (!"success".equals(checkoutForm.getStatus()) || !"SUCCESS".equals(checkoutForm.getPaymentStatus())) {
-            log.error("iyzico payment failed [{}]: {}", checkoutForm.getErrorCode(), checkoutForm.getErrorMessage());
+            log.error("iyzico payment failed [{}]: {} (Token: {}, ConversationId: {})", 
+                      checkoutForm.getErrorCode(), checkoutForm.getErrorMessage(), token, conversationId);
             throw new RuntimeException("Ödeme doğrulanamadı: " +
                     (checkoutForm.getErrorMessage() != null ? checkoutForm.getErrorMessage() : checkoutForm.getPaymentStatus()));
         }
+
+        if (checkoutForm.getConversationId() == null || !checkoutForm.getConversationId().equals(conversationId)) {
+            log.error("iyzico conversationId mismatch! Expected: {}, Received: {} (Token: {})", 
+                      conversationId, checkoutForm.getConversationId(), token);
+            throw new RuntimeException("Ödeme doğrulanamadı: Güvenlik ihlali (Geçersiz ConversationId).");
+        }
+
+        log.info("iyzico payment verified successfully. Token: {}, ConversationId: {}", token, conversationId);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));

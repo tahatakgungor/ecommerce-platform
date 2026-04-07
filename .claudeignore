@@ -1,0 +1,18 @@
+# Maven build çıktıları — 80MB, compiled class/jar dosyaları
+product-service/target/
+
+# Maven wrapper binary
+.mvn/wrapper/maven-wrapper.jar
+
+# Git internals
+.git/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Loglar
+*.log
+*.tmp
+.DS_Store
