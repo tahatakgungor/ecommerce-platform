@@ -10,6 +10,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.file.NoSuchFileException;
 
@@ -43,6 +44,17 @@ public class GlobalExceptionHandler {
     public ApiResponse<String> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
         log.warn("Dosya boyutu limiti aşıldı: {}", ex.getMessage());
         return ApiResponse.error("Dosya boyutu limiti aşıldı. Lütfen daha küçük bir dosya yükleyin.");
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public org.springframework.http.ResponseEntity<ApiResponse<String>> handleResponseStatus(ResponseStatusException ex) {
+        log.warn("HTTP durum hatası [{}]: {}", ex.getStatusCode(), ex.getReason());
+        String message = (ex.getReason() == null || ex.getReason().isBlank())
+                ? "İstek işlenemedi."
+                : ex.getReason();
+        return org.springframework.http.ResponseEntity
+                .status(ex.getStatusCode())
+                .body(ApiResponse.error(message));
     }
 
     // RuntimeException önce yakalanmalı (daha spesifik)

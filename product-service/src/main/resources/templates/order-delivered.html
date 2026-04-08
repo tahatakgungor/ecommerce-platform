@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siparişiniz Teslim Edildi</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f4f6f8; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1f2937; }
+        .container { max-width: 620px; margin: 20px auto; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; background: #fff; }
+        .header { background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; padding: 30px 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header p { margin: 8px 0 0; font-size: 14px; opacity: .94; }
+        .content { padding: 26px 22px; }
+        .badge { display: inline-block; background: #f0fdf4; border: 1px solid #86efac; color: #166534; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+        .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+        .btn { display: inline-block; padding: 12px 22px; border-radius: 8px; background: #15803d; color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; }
+        .cta { text-align: center; margin: 18px 0 6px; }
+        .footer { background: #f8fafc; color: #6b7280; text-align: center; font-size: 12px; padding: 16px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>SERRAVIT</h1>
+        <p>Siparişiniz başarıyla teslim edildi.</p>
+    </div>
+
+    <div class="content">
+        <span class="badge">Teslim Edildi</span>
+        <p>Merhaba <strong th:text="${order.name != null ? order.name : (order.guestName != null ? order.guestName : 'Müşterimiz')}">Müşteri</strong>,</p>
+        <p>Siparişiniz tamamlandı. Bizi tercih ettiğiniz için teşekkür ederiz.</p>
+
+        <div class="box">
+            <p><strong>Sipariş No:</strong> #<span th:text="${order.invoice}">INV-123456</span></p>
+            <p th:if="${order.shippingCarrier}"><strong>Kargo Firması:</strong> <span th:text="${order.shippingCarrier}">Aras Kargo</span></p>
+            <p th:if="${order.trackingNumber}"><strong>Takip Numarası:</strong> <span style="font-family: monospace; font-weight: 700;" th:text="${order.trackingNumber}">123456789</span></p>
+        </div>
+
+        <p style="font-size: 14px; color: #4b5563; margin-top: 14px;">Ürünü kullandıktan sonra deneyiminizi paylaşmanız, diğer müşteriler için çok değerli olacaktır.</p>
+
+        <div class="cta">
+            <a href="https://serravit.com/user-dashboard" class="btn">Siparişi Değerlendir</a>
+        </div>
+    </div>
+
+    <div class="footer">
+        &copy; 2026 Serravit Doğal Sağlık Ürünleri. Bu e-posta otomatik olarak oluşturulmuştur.
+    </div>
+</div>
+</body>
+</html>

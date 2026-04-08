@@ -5,60 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Siparişiniz Kargoya Verildi</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-        .container { max-width: 600px; margin: 20px auto; border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
-        .header { background-color: #198754; color: white; padding: 30px; text-align: center; }
-        .content { padding: 40px; }
-        .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; }
-        .shipping-info { background-color: #e9f7ef; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px dashed #198754; }
-        .btn { display: inline-block; padding: 15px 30px; background-color: #198754; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
-        .order-summary { font-size: 14px; color: #666; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+        body { margin: 0; padding: 0; background: #f4f6f8; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1f2937; }
+        .container { max-width: 620px; margin: 20px auto; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; background: #fff; }
+        .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; padding: 30px 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header p { margin: 8px 0 0; font-size: 14px; opacity: .92; }
+        .content { padding: 26px 22px; }
+        .badge { display: inline-block; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+        .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+        .btn { display: inline-block; padding: 12px 22px; border-radius: 8px; background: #1d4ed8; color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; }
+        .cta { text-align: center; margin: 20px 0 8px; }
+        .footer { background: #f8fafc; color: #6b7280; text-align: center; font-size: 12px; padding: 16px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>SERRAVİT</h1>
-            <p>Siparişiniz Yola Çıktı!</p>
+<div class="container">
+    <div class="header">
+        <h1>SERRAVIT</h1>
+        <p>Siparişiniz kargoya verildi ve yola çıktı.</p>
+    </div>
+
+    <div class="content">
+        <span class="badge">Kargoda</span>
+        <p>Merhaba <strong th:text="${order.name != null ? order.name : (order.guestName != null ? order.guestName : 'Müşterimiz')}">Müşteri</strong>,</p>
+        <p>Kargo bilgilerinizi aşağıda paylaşıyoruz:</p>
+
+        <div class="box">
+            <p><strong>Sipariş No:</strong> #<span th:text="${order.invoice}">INV-123456</span></p>
+            <p><strong>Kargo Firması:</strong> <span th:text="${order.shippingCarrier}">Aras Kargo</span></p>
+            <p><strong>Takip Numarası:</strong> <span style="font-family: monospace; font-weight: 700;" th:text="${order.trackingNumber}">123456789</span></p>
+            <p><strong>Gönderim Tarihi:</strong> <span th:text="${order.shippedAt}">08.04.2024</span></p>
         </div>
-        <div class="content">
-            <p>Merhaba <strong th:text="${order.name != null ? order.name : (order.guestName != null ? order.guestName : 'Müşterimiz')}">Müşteri</strong>,</p>
-            <p>Beklediğiniz an geldi! Siparişiniz kargoya verildi. Kargo bilgilerinizi aşağıda görebilirsiniz:</p>
 
-            <div class="shipping-info">
-                <p><strong>Kargo Firması:</strong> <span th:text="${order.shippingCarrier}">Aras Kargo</span></p>
-                <p><strong>Takip Numarası:</strong> <span th:text="${order.trackingNumber}">123456789</span></p>
-                <p><strong>Gönderim Tarihi:</strong> <span th:text="${order.shippedAt}">08.04.2024</span></p>
-            </div>
-
-            <p>Siparişinizi takip etmek için kargo firmasının web sitesini kullanabilir veya aşağıdaki butona tıklayabilirsiniz.</p>
-            
-            <div style="text-align: center;">
-                <th:block th:with="carrier=${order.shippingCarrier != null ? order.shippingCarrier.toLowerCase() : ''},
+        <div class="cta">
+            <th:block th:with="carrier=${order.shippingCarrier != null ? order.shippingCarrier.toLowerCase() : ''},
                                    no=${order.trackingNumber != null ? order.trackingNumber : ''},
                                    trackUrl=${carrier.contains('aras') ? 'https://kargotakip.araskargo.com.tr/mainpage.aspx?code=' + no :
                                              (carrier.contains('yurt') ? 'https://www.yurticikargo.com/tr/online-islemler/gonderi-sorgula?code=' + no :
                                              (carrier.contains('mng') ? 'https://www.mngkargo.com.tr/gonderi-sorgula?code=' + no :
-                                             (carrier.contains('ptt') ? 'https://www.ptt.gov.tr/tr/gonderi-sorgula?barcode=' + no :
-                                             (carrier.contains('s') and carrier.contains('rat') ? 'https://www.suratkargo.com.tr/KargoTakip/Index?code=' + no :
+                                             (carrier.contains('ptt') ? 'https://gonderitakip.ptt.gov.tr/Track/Verify?q=' + no :
+                                             (carrier.contains('s') and carrier.contains('rat') ? 'https://www.suratkargo.com.tr/KargoTakip/?code=' + no :
                                              (carrier.contains('ups') ? 'https://www.ups.com/track?tracknum=' + no :
-                                             (carrier.contains('dhl') ? 'https://www.dhl.com/tr-tr/home/tracking.html?tracking-id=' + no :
+                                             (carrier.contains('dhl') ? 'https://www.dhl.com/tr-tr/home/tracking/tracking-express.html?submit=1&tracking-id=' + no :
                                              'https://www.google.com/search?q=' + no + '+kargo+takip')))))))}">
-                    <a th:href="${trackUrl}" class="btn" style="display:inline-block;padding:15px 30px;background-color:#198754;color:white;text-decoration:none;border-radius:5px;font-weight:bold;">Kargomu Takip Et →</a>
-                </th:block>
-            </div>
-
-            <div class="order-summary">
-                <p><strong>Sipariş No:</strong> <span th:text="${order.invoice}">INV-123456</span></p>
-                <p><strong>Teslimat Adresi:</strong> <span th:text="${order.address + ', ' + order.city}">Adres</span></p>
-            </div>
-
-            <p style="margin-top: 40px;">Bizi tercih ettiğiniz için teşekkür ederiz!</p>
-            <p>Sevgiler,<br><strong>Serravit Ekibi</strong></p>
+                <a th:href="${trackUrl}" class="btn">Kargomu Takip Et</a>
+            </th:block>
         </div>
-        <div class="footer">
-            &copy; 2024 Serravit Doğal Sağlık Ürünleri. Tüm hakları saklıdır.
-        </div>
+
+        <p style="font-size: 14px; color: #4b5563;">Teslim edildiğinde size tekrar bilgilendirme e-postası göndereceğiz.</p>
     </div>
+
+    <div class="footer">
+        &copy; 2026 Serravit Doğal Sağlık Ürünleri. Bu e-posta otomatik olarak oluşturulmuştur.
+    </div>
+</div>
 </body>
 </html>

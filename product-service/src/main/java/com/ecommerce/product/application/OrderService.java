@@ -55,6 +55,12 @@ public class OrderService {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    @Value("${app.payment.confirm.fallback-mode:LOG_ONLY}")
+    private String paymentConfirmFallbackMode;
+
+    @Value("${app.payment.confirm.allow-body-fallback:true}")
+    private boolean allowBodyFallback;
+
     // ---------- iyzico: Ödeme başlat ----------
 
     public Map<String, Object> initializePayment(Map<String, Object> body, String email, HttpServletRequest httpRequest) {
@@ -236,6 +242,22 @@ public class OrderService {
             throw new RuntimeException("Ödeme token'ı eksik.");
         }
 
+        String conversationId = str(body, "conversationId");
+
+        if (conversationId != null && !conversationId.isBlank()) {
+            Optional<Order> byConversation = orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc(conversationId);
+            if (byConversation.isPresent() && !"waiting_payment".equals(byConversation.get().getStatus())) {
+                Order ex = byConversation.get();
+                log.info("[PaymentSecurity] Replay detected by conversationId. Returning existing order. conversationId={}, orderId={}",
+                        conversationId, ex.getId());
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("success", true);
+                resp.put("orderId", ex.getId().toString());
+                resp.put("order", toResponse(ex));
+                return resp;
+            }
+        }
+
         // Idempotency: aynı token ile veya conversationId ile zaten onaylanmış mı?
         Optional<Order> existing = (token != null && !token.isBlank()) 
                 ? orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc(token) 
@@ -249,11 +271,12 @@ public class OrderService {
                 resp.put("success", true);
                 resp.put("orderId", ex.getId().toString());
                 resp.put("order", toResponse(ex));
+                log.info("[PaymentSecurity] Replay detected by token. Returning existing order. token={}, orderId={}",
+                        token, ex.getId());
                 return resp;
             }
         }
 
-        String conversationId = str(body, "conversationId");
         RetrieveCheckoutFormRequest retrieveRequest = new RetrieveCheckoutFormRequest();
         retrieveRequest.setLocale("tr");
         retrieveRequest.setConversationId(conversationId);
@@ -263,7 +286,7 @@ public class OrderService {
         CheckoutForm checkoutForm = CheckoutForm.retrieve(retrieveRequest, iyzicoOptions);
 
         if (!"success".equals(checkoutForm.getStatus()) || !"SUCCESS".equals(checkoutForm.getPaymentStatus())) {
-            log.error("iyzico payment failed [{}]: {} (Token: {}, ConversationId: {})", 
+            log.error("[PaymentSecurity] iyzico payment failed [{}]: {} (Token: {}, ConversationId: {})",
                       checkoutForm.getErrorCode(), checkoutForm.getErrorMessage(), token, conversationId);
             throw new RuntimeException("Ödeme doğrulanamadı: " +
                     (checkoutForm.getErrorMessage() != null ? checkoutForm.getErrorMessage() : checkoutForm.getPaymentStatus()));
@@ -283,7 +306,12 @@ public class OrderService {
         Order order = orderLookup.orElse(null);
 
         if (order == null) {
-            log.warn("Draft order not found for conversationId: {}. Attempting to create new order from body.", iyzicoConvId);
+            log.warn("[PaymentSecurity] Draft order not found. token={}, conversationId={}, fallbackMode={}",
+                    token, iyzicoConvId, paymentConfirmFallbackMode);
+            if (isFallbackBlocked()) {
+                throw new RuntimeException("Ödeme doğrulanamadı. Sipariş taslağı bulunamadı.");
+            }
+
             order = new Order();
             // Fallback: Eskiden olduğu gibi body içinden doldur (geçiş sürecinde hata almamak için)
             order.setName(str(body, "name"));
@@ -326,7 +354,8 @@ public class OrderService {
             double iyzicoAmount = checkoutForm.getPaidPrice().doubleValue();
             double dbAmount = order.getTotalAmount();
             if (Math.abs(iyzicoAmount - dbAmount) > 0.1) {
-                log.error("Amount mismatch! Iyzico: {}, DB: {} (OrderID: {})", iyzicoAmount, dbAmount, order.getId());
+                log.error("[PaymentSecurity] Amount mismatch! Iyzico: {}, DB: {}, token={}, conversationId={}, orderId={}",
+                        iyzicoAmount, dbAmount, token, conversationId, order.getId());
                 throw new RuntimeException("Ödeme tutarı uyuşmazlığı tespit edildi.");
             }
         }
@@ -348,8 +377,12 @@ public class OrderService {
             saved = orderRepository.save(order);
         } catch (DataIntegrityViolationException e) {
             // Race condition: başka bir thread aynı token ile siparişi zaten kaydetmiş
-            log.warn("Duplicate iyzicoToken race condition caught for token: {}", token);
+            log.warn("[PaymentSecurity] Duplicate iyzicoToken race condition caught. token={}, conversationId={}",
+                    token, conversationId);
             Optional<Order> duplicate = orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc(token);
+            if (duplicate.isEmpty() && conversationId != null && !conversationId.isBlank()) {
+                duplicate = orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc(conversationId);
+            }
             if (duplicate.isPresent()) {
                 Order ex = duplicate.get();
                 Map<String, Object> resp = new LinkedHashMap<>();
@@ -374,6 +407,16 @@ public class OrderService {
         }
 
         return response;
+    }
+
+    private boolean isFallbackBlocked() {
+        if (!allowBodyFallback) {
+            return true;
+        }
+        if (paymentConfirmFallbackMode == null || paymentConfirmFallbackMode.isBlank()) {
+            return false;
+        }
+        return "BLOCK".equalsIgnoreCase(paymentConfirmFallbackMode.trim());
     }
 
     // ---------- Kullanıcının siparişleri ----------

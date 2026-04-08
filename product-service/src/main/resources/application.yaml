@@ -63,6 +63,24 @@ app:
       folder: ${CLOUDINARY_FOLDER:serravit}
   security:
     require-startup-validation: ${REQUIRE_STARTUP_VALIDATION:false}
+    payment:
+      init-rate-limit:
+        max-attempts: ${PAYMENT_INIT_RATE_LIMIT_MAX_ATTEMPTS:20}
+        window-minutes: ${PAYMENT_INIT_RATE_LIMIT_WINDOW_MINUTES:10}
+      confirm-rate-limit:
+        max-attempts: ${PAYMENT_CONFIRM_RATE_LIMIT_MAX_ATTEMPTS:25}
+        window-minutes: ${PAYMENT_CONFIRM_RATE_LIMIT_WINDOW_MINUTES:10}
+    order-lookup-rate-limit:
+      max-attempts: ${ORDER_LOOKUP_RATE_LIMIT_MAX_ATTEMPTS:12}
+      window-minutes: ${ORDER_LOOKUP_RATE_LIMIT_WINDOW_MINUTES:15}
+  payment:
+    confirm:
+      allow-body-fallback: ${PAYMENT_CONFIRM_ALLOW_BODY_FALLBACK:true}
+      fallback-mode: ${PAYMENT_CONFIRM_FALLBACK_MODE:LOG_ONLY}
+  shipping:
+    auto-deliver-days: ${AUTO_DELIVER_DAYS:10}
+    auto-deliver-cron: ${AUTO_DELIVER_CRON:0 0 2 * * *}
+    auto-deliver-zone: ${AUTO_DELIVER_ZONE:Europe/Istanbul}
 
 logging:
   level:

@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
@@ -55,6 +56,8 @@ class OrderServiceTest {
                 iyzicoOptions,
                 eventPublisher
         );
+        ReflectionTestUtils.setField(orderService, "paymentConfirmFallbackMode", "LOG_ONLY");
+        ReflectionTestUtils.setField(orderService, "allowBodyFallback", true);
     }
 
     @Test
@@ -234,6 +237,41 @@ class OrderServiceTest {
             RuntimeException ex = assertThrows(RuntimeException.class,
                     () -> orderService.confirmPayment(body, "test@mail.com"));
             assertEquals("Ödeme doğrulanamadı: Güvenlik ihlali (Geçersiz ConversationId).", ex.getMessage());
+        }
+    }
+
+    @Test
+    void confirmPayment_whenDraftMissingAndFallbackBlocked_shouldThrow() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("token", "iyzico-test-token-no-draft");
+        body.put("conversationId", "conv-no-draft");
+        body.put("email", "customer@mail.com");
+        body.put("name", "Customer");
+        body.put("cart", List.of());
+
+        when(orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc("conv-no-draft"))
+                .thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc("iyzico-test-token-no-draft"))
+                .thenReturn(Optional.empty());
+
+        CheckoutForm mockForm = mock(CheckoutForm.class);
+        when(mockForm.getStatus()).thenReturn("success");
+        when(mockForm.getPaymentStatus()).thenReturn("SUCCESS");
+        when(mockForm.getPaymentId()).thenReturn("PAY-NO-DRAFT");
+        when(mockForm.getConversationId()).thenReturn("conv-no-draft");
+        when(mockForm.getPrice()).thenReturn(new BigDecimal("0.00"));
+        when(mockForm.getPaidPrice()).thenReturn(new BigDecimal("0.00"));
+
+        ReflectionTestUtils.setField(orderService, "paymentConfirmFallbackMode", "BLOCK");
+        ReflectionTestUtils.setField(orderService, "allowBodyFallback", false);
+
+        try (MockedStatic<CheckoutForm> mockedForm = mockStatic(CheckoutForm.class)) {
+            mockedForm.when(() -> CheckoutForm.retrieve(any(RetrieveCheckoutFormRequest.class), any(Options.class)))
+                    .thenReturn(mockForm);
+
+            RuntimeException ex = assertThrows(RuntimeException.class,
+                    () -> orderService.confirmPayment(body, "customer@mail.com"));
+            assertEquals("Ödeme doğrulanamadı. Sipariş taslağı bulunamadı.", ex.getMessage());
         }
     }
 }

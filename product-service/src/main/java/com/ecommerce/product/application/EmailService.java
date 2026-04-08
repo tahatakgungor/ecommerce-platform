@@ -41,6 +41,9 @@ public class EmailService {
     @Value("${app.mail.resend.reply-to:}")
     private String replyToEmail;
 
+    @Value("${app.mail.resend.max-attempts:2}")
+    private int resendMaxAttempts;
+
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
             .build();
@@ -128,6 +131,7 @@ public class EmailService {
         if (to == null || to.isBlank()) return;
 
         try {
+            log.info("[Email] Preparing order confirmation mail. invoice={}, recipient={}", order.getInvoice(), to);
             Context context = new Context();
             context.setVariable("order", order);
             
@@ -148,6 +152,8 @@ public class EmailService {
         if (to == null || to.isBlank()) return;
 
         try {
+            log.info("[Email] Preparing shipping update mail. invoice={}, recipient={}, carrier={}, tracking={}",
+                    order.getInvoice(), to, order.getShippingCarrier(), order.getTrackingNumber());
             Context context = new Context();
             context.setVariable("order", order);
             
@@ -160,6 +166,22 @@ public class EmailService {
             sendEmail(to, "Siparişiniz Kargoya Verildi - SERRAVİT", null, htmlContent, null, "Kargo takip e-postası");
         } catch (Exception e) {
             log.error("Kargo takip e-postası gönderilemedi: {}", e.getMessage());
+        }
+    }
+
+    public void sendDeliveryConfirmation(Order order) {
+        String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
+        if (to == null || to.isBlank()) return;
+
+        try {
+            log.info("[Email] Preparing delivery confirmation mail. invoice={}, recipient={}", order.getInvoice(), to);
+            Context context = new Context();
+            context.setVariable("order", order);
+
+            String htmlContent = templateEngine.process("order-delivered", context);
+            sendEmail(to, "Siparişiniz Teslim Edildi - SERRAVİT", null, htmlContent, null, "Teslim bildirimi e-postası");
+        } catch (Exception e) {
+            log.error("Teslim bildirimi e-postası gönderilemedi: {}", e.getMessage());
         }
     }
 
@@ -200,21 +222,38 @@ public class EmailService {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() >= 200 && response.statusCode() < 300) {
-                ResendSendEmailResponse success = objectMapper.readValue(response.body(), ResendSendEmailResponse.class);
-                log.info("{} başarıyla gönderildi: {} | id={}", emailType, toEmail, success.id());
+        int maxAttempts = Math.max(1, resendMaxAttempts);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                    ResendSendEmailResponse success = objectMapper.readValue(response.body(), ResendSendEmailResponse.class);
+                    log.info("{} başarıyla gönderildi: {} | id={} | attempt={}/{}", emailType, toEmail, success.id(), attempt, maxAttempts);
+                    return;
+                }
+
+                ResendErrorResponse error = parseErrorResponse(response.body());
+                if (response.statusCode() >= 500 && attempt < maxAttempts) {
+                    log.warn("{} geçici hata aldı. status={} error={} attempt={}/{}. Yeniden denenecek.",
+                            emailType, response.statusCode(), error.message(), attempt, maxAttempts);
+                    continue;
+                }
+                log.error("{} gönderilemedi. status={} error={} attempt={}/{}",
+                        emailType, response.statusCode(), error.message(), attempt, maxAttempts);
+                return;
+            } catch (IOException e) {
+                if (attempt < maxAttempts) {
+                    log.warn("{} gönderimi IO hatası aldı (attempt={}/{}): {}. Yeniden denenecek.",
+                            emailType, attempt, maxAttempts, e.getMessage());
+                    continue;
+                }
+                log.error("{} gönderilemedi (IO): {}", emailType, e.getMessage(), e);
+                return;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("{} gönderilemedi (interrupt): {}", emailType, e.getMessage(), e);
                 return;
             }
-
-            ResendErrorResponse error = parseErrorResponse(response.body());
-            log.error("{} gönderilemedi. status={} error={}", emailType, response.statusCode(), error.message());
-        } catch (IOException e) {
-            log.error("{} gönderilemedi: {}", emailType, e.getMessage(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("{} gönderilemedi: {}", emailType, e.getMessage(), e);
         }
     }
 
