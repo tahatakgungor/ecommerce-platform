@@ -153,7 +153,10 @@ public class EmailService {
 
     public void sendShippingUpdate(Order order) {
         String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
-        if (to == null || to.isBlank()) return;
+        if (to == null || to.isBlank()) {
+            log.warn("[Email] Shipping update mail skipped: recipient is empty. invoice={}", order.getInvoice());
+            return;
+        }
 
         try {
             log.info("[Email] Preparing shipping update mail. invoice={}, recipient={}, carrier={}, tracking={}",
@@ -232,7 +235,14 @@ public class EmailService {
     }
 
     private void sendEmail(String toEmail, String subject, String text, String html, String explicitReplyTo, String emailType) {
-        validateConfig();
+        if (toEmail == null || toEmail.isBlank()) {
+            log.warn("{} gönderimi atlandı: alıcı e-posta boş.", emailType);
+            return;
+        }
+        if (!isConfigValid()) {
+            log.warn("{} gönderimi atlandı: mail konfigürasyonu eksik. recipient={}", emailType, toEmail);
+            return;
+        }
 
         String effectiveReplyTo = explicitReplyTo;
         if ((effectiveReplyTo == null || effectiveReplyTo.isBlank()) && replyToEmail != null && !replyToEmail.isBlank()) {
@@ -293,15 +303,16 @@ public class EmailService {
         }
     }
 
-    private void validateConfig() {
+    private boolean isConfigValid() {
         if (resendApiKey == null || resendApiKey.isBlank()) {
             log.warn("RESEND_API_KEY tanımlı değil. E-posta gönderimi yapılamıyor.");
-            return;
+            return false;
         }
         if (fromEmail == null || fromEmail.isBlank()) {
             log.warn("RESEND_FROM_EMAIL tanımlı değil. E-posta gönderimi yapılamıyor.");
-            return;
+            return false;
         }
+        return true;
     }
 
     private String toJson(Map<String, Object> payload, String emailType) {
