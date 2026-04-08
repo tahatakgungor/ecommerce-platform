@@ -95,7 +95,7 @@ public class BlogPostService {
         }
 
         String title = trimOrEmpty(request.getTitle());
-        String contentHtml = trimOrEmpty(request.getContentHtml());
+        String contentHtml = sanitizeHtmlContent(request.getContentHtml());
         if (title.isBlank()) {
             throw new RuntimeException("Blog başlığı zorunludur.");
         }
@@ -113,13 +113,13 @@ public class BlogPostService {
     }
 
     private void applyFields(BlogPost target, BlogPost source, BlogPost existing) {
-        target.setTitle(trimOrEmpty(source.getTitle()));
+        target.setTitle(stripHtmlTags(trimOrEmpty(source.getTitle())));
         target.setSlug(resolveSlug(source));
-        target.setSummary(trimOrNull(source.getSummary()));
-        target.setCoverImage(trimOrNull(source.getCoverImage()));
-        target.setContentHtml(trimOrEmpty(source.getContentHtml()));
-        target.setSeoTitle(trimOrNull(source.getSeoTitle()));
-        target.setSeoDescription(trimOrNull(source.getSeoDescription()));
+        target.setSummary(stripAndNull(source.getSummary()));
+        target.setCoverImage(sanitizeCoverImage(source.getCoverImage()));
+        target.setContentHtml(sanitizeHtmlContent(source.getContentHtml()));
+        target.setSeoTitle(stripAndNull(source.getSeoTitle()));
+        target.setSeoDescription(stripAndNull(source.getSeoDescription()));
         target.setRelatedProductIds(sanitizeRelatedIds(source.getRelatedProductIds()));
 
         String normalizedStatus = normalizeStatus(source.getStatus());
@@ -209,5 +209,47 @@ public class BlogPostService {
         String trimmed = trimOrEmpty(value);
         return trimmed.isBlank() ? null : trimmed;
     }
-}
 
+    private String stripAndNull(String value) {
+        String stripped = stripHtmlTags(trimOrEmpty(value));
+        return stripped.isBlank() ? null : stripped;
+    }
+
+    private String stripHtmlTags(String value) {
+        return trimOrEmpty(value)
+                .replaceAll("<[^>]*>", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String sanitizeHtmlContent(String value) {
+        String html = trimOrEmpty(value);
+        if (html.isBlank()) {
+            return html;
+        }
+        return html
+                .replaceAll("(?is)<script[^>]*>.*?</script>", "")
+                .replaceAll("(?is)<style[^>]*>.*?</style>", "")
+                .replaceAll("(?is)<iframe[^>]*>.*?</iframe>", "")
+                .replaceAll("(?i)\\son\\w+\\s*=\\s*\"[^\"]*\"", "")
+                .replaceAll("(?i)\\son\\w+\\s*=\\s*'[^']*'", "")
+                .replaceAll("(?i)\\shref\\s*=\\s*\"javascript:[^\"]*\"", " href=\"#\"")
+                .replaceAll("(?i)\\ssrc\\s*=\\s*\"javascript:[^\"]*\"", "")
+                .trim();
+    }
+
+    private String sanitizeCoverImage(String value) {
+        String cover = trimOrNull(value);
+        if (cover == null) {
+            return null;
+        }
+        String lowered = cover.toLowerCase(Locale.ROOT);
+        if (lowered.startsWith("javascript:") || lowered.startsWith("data:text/html")) {
+            return null;
+        }
+        if (cover.startsWith("/") || lowered.startsWith("http://") || lowered.startsWith("https://")) {
+            return cover;
+        }
+        return null;
+    }
+}
