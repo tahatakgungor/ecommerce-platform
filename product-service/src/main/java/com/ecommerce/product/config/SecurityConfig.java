@@ -87,6 +87,8 @@ public class SecurityConfig {
                                 "/api/user/forget-password",
                                 "/api/user/confirm-forget-password",
                                 "/api/user/update-user",
+                                "/api/order/initialize-payment",
+                                "/api/order/confirm-payment",
                                 "/api/contact/send",
                                 "/api/user/newsletter"
                         ))
