@@ -56,6 +56,16 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, result, null));
     }
 
+    // Admin: kargo bilgisi güncelle
+    @PatchMapping("/update-shipping/{id}")
+    @PreAuthorize("hasAnyAuthority('Admin','Staff')")
+    public ResponseEntity<?> updateShippingInfo(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body) {
+        Map<String, Object> result = orderService.updateShippingInfo(id, body.get("carrier"), body.get("trackingNumber"));
+        return ResponseEntity.ok(new ApiResponse<>(true, result, null));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ResponseEntity<?> getOrderById(@PathVariable UUID id) {

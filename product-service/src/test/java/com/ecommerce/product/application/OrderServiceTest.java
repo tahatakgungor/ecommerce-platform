@@ -40,6 +40,7 @@ class OrderServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private CouponRepository couponRepository;
     @Mock private Options iyzicoOptions;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private OrderService orderService;
 
@@ -51,7 +52,8 @@ class OrderServiceTest {
                 productRepository,
                 couponRepository,
                 new ObjectMapper(),
-                iyzicoOptions
+                iyzicoOptions,
+                eventPublisher
         );
     }
 

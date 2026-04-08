@@ -1,5 +1,6 @@
 package com.ecommerce.product.application;
 
+import com.ecommerce.product.domain.Order;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -8,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import java.io.IOException;
 import java.net.URI;
@@ -15,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +30,7 @@ public class EmailService {
     private static final String RESEND_API_URL = "https://api.resend.com/emails";
 
     private final ObjectMapper objectMapper;
+    private final TemplateEngine templateEngine;
 
     @Value("${app.mail.resend.api-key:}")
     private String resendApiKey;
@@ -50,7 +55,8 @@ public class EmailService {
                         "Bu bağlantı 24 saat geçerlidir.\n" +
                         "Eğer bu isteği siz yapmadıysanız bu e-postayı görmezden gelin.\n\n" +
                         "SERRAVİT Ekibi",
-                null,
+                null, // html
+                null, // replyTo
                 "Doğrulama e-postası"
         );
     }
@@ -64,6 +70,7 @@ public class EmailService {
                         resetToken + "\n\n" +
                         "Not: Bu token 24 saat geçerlidir.\n" +
                         "Eğer bu isteği siz yapmadıysanız bu e-postayı görmezden gelin.",
+                null,
                 null,
                 "Şifre sıfırlama e-postası"
         );
@@ -80,6 +87,7 @@ public class EmailService {
                         "Eğer bu işlemi siz başlatmadıysanız hesabınızın şifresini hemen değiştirin.\n\n" +
                         "SERRAVİT Ekibi",
                 null,
+                null,
                 "Şifre değiştirme doğrulama e-postası"
         );
     }
@@ -91,6 +99,7 @@ public class EmailService {
                 "Gönderen: " + fromName + "\n" +
                         "E-posta: " + fromEmail + "\n\n" +
                         "Mesaj:\n" + messageBody,
+                null,
                 fromEmail,
                 "İletişim formu e-postası"
         );
@@ -107,11 +116,64 @@ public class EmailService {
                         "Not: Bu bağlantı 24 saat geçerlidir.\n" +
                         "İyi çalışmalar.",
                 null,
+                null,
                 "Davet e-postası"
         );
     }
 
-    private void sendEmail(String toEmail, String subject, String text, String explicitReplyTo, String emailType) {
+    // --- Sipariş Bildirimleri ---
+
+    public void sendOrderConfirmation(Order order) {
+        String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
+        if (to == null || to.isBlank()) return;
+
+        try {
+            Context context = new Context();
+            context.setVariable("order", order);
+            
+            // Deserialize cart for template iteration
+            List<Map<String, Object>> cartItems = deserializeCart(order.getCart());
+            context.setVariable("cartItems", cartItems);
+            
+            String htmlContent = templateEngine.process("order-placed", context);
+            
+            sendEmail(to, "Siparişiniz Alındı - SERRAVİT", null, htmlContent, null, "Sipariş onayı e-postası");
+        } catch (Exception e) {
+            log.error("Sipariş onayı e-postası gönderilemedi: {}", e.getMessage());
+        }
+    }
+
+    public void sendShippingUpdate(Order order) {
+        String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
+        if (to == null || to.isBlank()) return;
+
+        try {
+            Context context = new Context();
+            context.setVariable("order", order);
+            
+            // Deserialize cart for template iteration
+            List<Map<String, Object>> cartItems = deserializeCart(order.getCart());
+            context.setVariable("cartItems", cartItems);
+            
+            String htmlContent = templateEngine.process("order-shipped", context);
+            
+            sendEmail(to, "Siparişiniz Kargoya Verildi - SERRAVİT", null, htmlContent, null, "Kargo takip e-postası");
+        } catch (Exception e) {
+            log.error("Kargo takip e-postası gönderilemedi: {}", e.getMessage());
+        }
+    }
+
+    private List<Map<String, Object>> deserializeCart(String cartJson) {
+        if (cartJson == null || cartJson.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(cartJson, new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            log.warn("Cart JSON deserialization failed for email: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private void sendEmail(String toEmail, String subject, String text, String html, String explicitReplyTo, String emailType) {
         validateConfig();
 
         String effectiveReplyTo = explicitReplyTo;
@@ -119,13 +181,15 @@ public class EmailService {
             effectiveReplyTo = replyToEmail;
         }
 
-        Map<String, Object> payload = Map.of(
-                "from", fromEmail,
-                "to", List.of(toEmail),
-                "subject", subject,
-                "text", text,
-                "reply_to", effectiveReplyTo == null || effectiveReplyTo.isBlank() ? List.of() : List.of(effectiveReplyTo)
-        );
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("from", fromEmail);
+        payload.put("to", List.of(toEmail));
+        payload.put("subject", subject);
+        if (text != null) payload.put("text", text);
+        if (html != null) payload.put("html", html);
+        if (effectiveReplyTo != null && !effectiveReplyTo.isBlank()) {
+            payload.put("reply_to", List.of(effectiveReplyTo));
+        }
 
         String requestBody = toJson(payload, emailType);
         HttpRequest request = HttpRequest.newBuilder()
@@ -146,24 +210,22 @@ public class EmailService {
 
             ResendErrorResponse error = parseErrorResponse(response.body());
             log.error("{} gönderilemedi. status={} error={}", emailType, response.statusCode(), error.message());
-            throw new RuntimeException(emailType + " gönderilemedi: " + error.message());
         } catch (IOException e) {
             log.error("{} gönderilemedi: {}", emailType, e.getMessage(), e);
-            throw new RuntimeException(emailType + " gönderilemedi. Resend yanıtı okunamadı.");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("{} gönderilemedi: {}", emailType, e.getMessage(), e);
-            throw new RuntimeException(emailType + " gönderilemedi. İşlem kesintiye uğradı.");
         }
     }
 
     private void validateConfig() {
         if (resendApiKey == null || resendApiKey.isBlank()) {
-            throw new IllegalStateException("RESEND_API_KEY tanımlı değil. E-posta gönderimi yapılamıyor.");
+            log.warn("RESEND_API_KEY tanımlı değil. E-posta gönderimi yapılamıyor.");
+            return;
         }
-
         if (fromEmail == null || fromEmail.isBlank()) {
-            throw new IllegalStateException("RESEND_FROM_EMAIL tanımlı değil. E-posta gönderimi yapılamıyor.");
+            log.warn("RESEND_FROM_EMAIL tanımlı değil. E-posta gönderimi yapılamıyor.");
+            return;
         }
     }
 

@@ -24,8 +24,13 @@ public class Order {
     private String zipCode;
     private String shippingOption;
 
-    // pending | processing | delivered | cancelled
+    // pending | processing | shipped | delivered | cancelled
     private String status;
+
+    // Kargo Takip Bilgileri
+    private String shippingCarrier;
+    private String trackingNumber;
+    private LocalDateTime shippedAt;
 
     // müşterinin UUID string hali (login'li kullanıcılar için)
     private String userId;

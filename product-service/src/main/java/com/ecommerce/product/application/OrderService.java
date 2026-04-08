@@ -50,6 +50,7 @@ public class OrderService {
     private final CouponRepository couponRepository;
     private final ObjectMapper objectMapper;
     private final Options iyzicoOptions;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -364,6 +365,14 @@ public class OrderService {
         response.put("success", true);
         response.put("orderId", saved.getId().toString());
         response.put("order", toResponse(saved));
+
+        // Sipariş başarılı olduğunda asenkron bildirim gönder
+        try {
+            eventPublisher.publishEvent(new com.ecommerce.product.event.OrderPlacedEvent(saved));
+        } catch (Exception e) {
+            log.warn("Failed to publish OrderPlacedEvent: {}", e.getMessage());
+        }
+
         return response;
     }
 
@@ -434,6 +443,31 @@ public class OrderService {
         return Map.of("order", toResponse(orderRepository.save(order)));
     }
 
+    // ---------- Kargo Yönetimi ----------
+
+    @Transactional
+    public Map<String, Object> updateShippingInfo(UUID id, String carrier, String trackingNumber) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
+
+        order.setStatus("shipped");
+        order.setShippingCarrier(carrier);
+        order.setTrackingNumber(trackingNumber);
+        order.setShippedAt(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
+
+        Order saved = orderRepository.save(order);
+        log.info("Order {} marked as shipped. Carrier: {}, Tracking: {}", id, carrier, trackingNumber);
+
+        // Bildirim gönder
+        try {
+            eventPublisher.publishEvent(new com.ecommerce.product.event.OrderShippedEvent(saved));
+        } catch (Exception e) {
+            log.warn("Failed to publish OrderShippedEvent: {}", e.getMessage());
+        }
+
+        return Map.of("order", toResponse(saved));
+    }
+
     // ---------- Yardımcı metotlar ----------
 
     private Map<String, Object> toResponse(Order o) {
@@ -464,6 +498,12 @@ public class OrderService {
         map.put("iyzicoToken", o.getIyzicoToken());
         map.put("iyzicoPaymentId", o.getIyzicoPaymentId());
         map.put("iyzicoConversationId", o.getIyzicoConversationId());
+        
+        // Kargo bilgileri
+        map.put("shippingCarrier", o.getShippingCarrier());
+        map.put("trackingNumber", o.getTrackingNumber());
+        map.put("shippedAt", o.getShippedAt() != null ? o.getShippedAt().toString() : null);
+
         return map;
     }
 

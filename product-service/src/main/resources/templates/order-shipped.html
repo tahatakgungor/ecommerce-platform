@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Siparişiniz Kargoya Verildi</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 20px auto; border: 1px solid #eee; border-radius: 8px; overflow: hidden; }
+        .header { background-color: #198754; color: white; padding: 30px; text-align: center; }
+        .content { padding: 40px; }
+        .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; }
+        .shipping-info { background-color: #e9f7ef; padding: 20px; border-radius: 5px; margin-bottom: 20px; border: 1px dashed #198754; }
+        .btn { display: inline-block; padding: 15px 30px; background-color: #198754; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 20px; }
+        .order-summary { font-size: 14px; color: #666; margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SERRAVİT</h1>
+            <p>Siparişiniz Yola Çıktı!</p>
+        </div>
+        <div class="content">
+            <p>Merhaba <strong th:text="${order.name != null ? order.name : (order.guestName != null ? order.guestName : 'Müşterimiz')}">Müşteri</strong>,</p>
+            <p>Beklediğiniz an geldi! Siparişiniz kargoya verildi. Kargo bilgilerinizi aşağıda görebilirsiniz:</p>
+
+            <div class="shipping-info">
+                <p><strong>Kargo Firması:</strong> <span th:text="${order.shippingCarrier}">Aras Kargo</span></p>
+                <p><strong>Takip Numarası:</strong> <span th:text="${order.trackingNumber}">123456789</span></p>
+                <p><strong>Gönderim Tarihi:</strong> <span th:text="${order.shippedAt}">08.04.2024</span></p>
+            </div>
+
+            <p>Siparişinizi takip etmek için kargo firmasının web sitesini kullanabilir veya aşağıdaki butona tıklayabilirsiniz.</p>
+            
+            <div style="text-align: center;">
+                <a href="#" class="btn">Kargomu Takip Et</a>
+            </div>
+
+            <div class="order-summary">
+                <p><strong>Sipariş No:</strong> <span th:text="${order.invoice}">INV-123456</span></p>
+                <p><strong>Teslimat Adresi:</strong> <span th:text="${order.address + ', ' + order.city}">Adres</span></p>
+            </div>
+
+            <p style="margin-top: 40px;">Bizi tercih ettiğiniz için teşekkür ederiz!</p>
+            <p>Sevgiler,<br><strong>Serravit Ekibi</strong></p>
+        </div>
+        <div class="footer">
+            &copy; 2024 Serravit Doğal Sağlık Ürünleri. Tüm hakları saklıdır.
+        </div>
+    </div>
+</body>
+</html>
