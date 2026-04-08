@@ -82,15 +82,27 @@ public class OrderService {
             buyer.setName(user.getFirstName() != null ? user.getFirstName() : "Müşteri");
             buyer.setSurname(user.getLastName() != null ? user.getLastName() : "-");
             buyer.setEmail(user.getEmail());
-            buyer.setIdentityNumber(user.getZipCode() != null && user.getZipCode().length() >= 11 ? user.getZipCode() : "11111111111");
+            // Identity number can be zipCode fallback for TR sandbox, or real input
+            String identity = user.getZipCode() != null && user.getZipCode().length() >= 11 ? user.getZipCode() : "11111111111";
+            buyer.setIdentityNumber(identity);
         } else {
+            String guestEmail = str(body, "email");
+            if (guestEmail == null || guestEmail.isBlank()) {
+                throw new RuntimeException("Misafir siparişi için e-posta adresi gereklidir.");
+            }
             buyer.setId("GUEST-" + UUID.randomUUID().toString().substring(0, 8));
             String fullName = str(body, "name") != null ? str(body, "name") : "Misafir Müşteri";
             String[] parts = fullName.split(" ");
             buyer.setName(parts[0]);
             buyer.setSurname(parts.length > 1 ? parts[parts.length - 1] : "-");
-            buyer.setEmail(str(body, "email") != null ? str(body, "email") : "guest@serravit.com");
-            buyer.setIdentityNumber("11111111111");
+            buyer.setEmail(guestEmail);
+            
+            // For guests, try to get identityNumber from body, else use zipCode, else sandbox fallback
+            String gIdentity = str(body, "identityNumber");
+            if (gIdentity == null || gIdentity.length() < 11) gIdentity = str(body, "zipCode");
+            if (gIdentity == null || gIdentity.length() < 11) gIdentity = "11111111111";
+            
+            buyer.setIdentityNumber(gIdentity);
         }
         
         String addr = str(body, "address");
@@ -310,16 +322,19 @@ public class OrderService {
     }
 
     public Map<String, Object> getSingleOrderForUser(String email, UUID id) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
-
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
 
-        if (!user.getId().toString().equals(order.getUserId())) {
-            throw new RuntimeException("Bu siparişi görüntüleme yetkiniz yok!");
+        if (!order.getEmail().equals(email) && !order.getUserId().equals(email)) {
+            // Check if it's the user's order
+            throw new RuntimeException("Bu siparişi görüntüleme yetkiniz yok.");
         }
+        return Map.of("order", toResponse(order));
+    }
 
+    public Map<String, Object> getOrderByInvoiceAndEmail(int invoice, String email) {
+        Order order = orderRepository.findByInvoiceAndEmail(invoice, email)
+                .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı veya e-posta eşleşmiyor."));
         return Map.of("order", toResponse(order));
     }
 

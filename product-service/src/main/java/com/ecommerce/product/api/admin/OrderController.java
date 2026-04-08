@@ -56,11 +56,19 @@ public class OrderController {
         return ResponseEntity.ok(new ApiResponse<>(true, result, null));
     }
 
-    // Admin: tekil sipariş
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('Admin','Staff')")
     public ResponseEntity<?> getOrderById(@PathVariable UUID id) {
         Map<String, Object> result = orderService.getSingleOrder(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, result, null));
+    }
+
+    // Misafir sipariş sorgulama
+    @GetMapping("/lookup")
+    public ResponseEntity<?> lookupOrder(
+            @RequestParam int invoice,
+            @RequestParam String email) {
+        Map<String, Object> result = orderService.getOrderByInvoiceAndEmail(invoice, email);
         return ResponseEntity.ok(new ApiResponse<>(true, result, null));
     }
 }
