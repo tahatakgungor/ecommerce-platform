@@ -33,14 +33,16 @@ public class OrderController {
             @RequestBody Map<String, Object> body,
             Authentication auth,
             HttpServletRequest request) {
-        Map<String, Object> result = orderService.initializePayment(body, auth.getName(), request);
+        String email = (auth != null) ? auth.getName() : "anonymousUser";
+        Map<String, Object> result = orderService.initializePayment(body, email, request);
         return ResponseEntity.ok(result);
     }
 
     // iyzico: ödeme doğrula ve siparişi kaydet
     @PostMapping("/confirm-payment")
     public ResponseEntity<?> confirmPayment(@RequestBody Map<String, Object> body, Authentication auth) {
-        Map<String, Object> result = orderService.confirmPayment(body, auth.getName());
+        String email = (auth != null) ? auth.getName() : "anonymousUser";
+        Map<String, Object> result = orderService.confirmPayment(body, email);
         return ResponseEntity.ok(result);
     }
 

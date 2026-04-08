@@ -122,6 +122,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/newsletter").permitAll()
                         // Logout - herkes erişebilir (cookie temizleme)
                         .requestMatchers("/api/user/logout").permitAll()
+                        // Payment endpoints - public (guests)
+                        .requestMatchers("/api/order/initialize-payment").permitAll()
+                        .requestMatchers("/api/order/confirm-payment").permitAll()
                         // Static dosyalar
                         .requestMatchers("/uploads/**").permitAll()
                         // Geri kalan her şey authentication gerektirir

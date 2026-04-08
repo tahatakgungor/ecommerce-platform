@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -56,8 +57,11 @@ public class OrderService {
     // ---------- iyzico: Ödeme başlat ----------
 
     public Map<String, Object> initializePayment(Map<String, Object> body, String email, HttpServletRequest httpRequest) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+        User user = null;
+        if (email != null && !email.isBlank() && !"anonymousUser".equals(email)) {
+            user = userRepository.findByEmail(email).orElse(null);
+        }
+
         CheckoutSummary cs = calculateCheckout(body, email);
 
         String conversationId = UUID.randomUUID().toString();
@@ -73,22 +77,36 @@ public class OrderService {
         request.setCallbackUrl(frontendUrl + "/api/payment-callback");
 
         Buyer buyer = new Buyer();
-        buyer.setId(user.getId().toString());
-        buyer.setName(user.getFirstName() != null ? user.getFirstName() : "Müşteri");
-        buyer.setSurname(user.getLastName() != null ? user.getLastName() : "-");
-        buyer.setEmail(user.getEmail());
-        buyer.setIdentityNumber("11111111111");
-        String addr = str(body, "address") != null ? str(body, "address") : "Belirtilmedi";
-        String city = str(body, "city") != null ? str(body, "city") : "Istanbul";
-        String country = str(body, "country") != null ? str(body, "country") : "Turkey";
-        buyer.setRegistrationAddress(addr + ", " + city);
+        if (user != null) {
+            buyer.setId(user.getId().toString());
+            buyer.setName(user.getFirstName() != null ? user.getFirstName() : "Müşteri");
+            buyer.setSurname(user.getLastName() != null ? user.getLastName() : "-");
+            buyer.setEmail(user.getEmail());
+            buyer.setIdentityNumber(user.getZipCode() != null && user.getZipCode().length() >= 11 ? user.getZipCode() : "11111111111");
+        } else {
+            buyer.setId("GUEST-" + UUID.randomUUID().toString().substring(0, 8));
+            String fullName = str(body, "name") != null ? str(body, "name") : "Misafir Müşteri";
+            String[] parts = fullName.split(" ");
+            buyer.setName(parts[0]);
+            buyer.setSurname(parts.length > 1 ? parts[parts.length - 1] : "-");
+            buyer.setEmail(str(body, "email") != null ? str(body, "email") : "guest@serravit.com");
+            buyer.setIdentityNumber("11111111111");
+        }
+        
+        String addr = str(body, "address");
+        String city = str(body, "city") != null ? str(body, "city") : (user != null && user.getCity() != null ? user.getCity() : "Istanbul");
+        String country = str(body, "country") != null ? str(body, "country") : (user != null && user.getCountry() != null ? user.getCountry() : "Turkey");
+        
+        buyer.setRegistrationAddress(addr != null ? addr + ", " + city : city);
         buyer.setCity(city);
         buyer.setCountry(country);
+        
         String clientIp = httpRequest.getHeader("X-Forwarded-For");
         if (clientIp == null || clientIp.isBlank()) clientIp = httpRequest.getRemoteAddr();
         buyer.setIp(clientIp != null ? clientIp.split(",")[0].trim() : "127.0.0.1");
-        String phone = str(body, "contact");
-        buyer.setGsmNumber(phone != null && !phone.isBlank() ? phone : "+905555555555");
+        
+        String phone = str(body, "contact") != null ? str(body, "contact") : (user != null ? user.getPhone() : null);
+        buyer.setGsmNumber(formatPhoneForIyzico(phone != null ? phone : "+905555555555"));
         request.setBuyer(buyer);
 
         Address address = new Address();
@@ -133,6 +151,7 @@ public class OrderService {
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("checkoutFormContent", result.getCheckoutFormContent());
+        response.put("paymentPageUrl", result.getPaymentPageUrl());
         response.put("token", result.getToken());
         response.put("conversationId", conversationId);
         response.put("subTotal", formatAmount(cs.subTotal()));
@@ -183,11 +202,24 @@ public class OrderService {
             throw new RuntimeException("Ödeme doğrulanamadı: Güvenlik ihlali (Geçersiz ConversationId).");
         }
 
-        log.info("iyzico payment verified successfully. Token: {}, ConversationId: {}", token, conversationId);
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
+        // paidPrice cross-check: iyzico'dan dönen tutarla backend hesabını karşılaştır
+        User user = null;
+        if (email != null && !email.isBlank() && !"anonymousUser".equals(email)) {
+            user = userRepository.findByEmail(email).orElse(null);
+        }
+        
         CheckoutSummary cs = calculateCheckout(body, email);
+
+        if (checkoutForm.getPaidPrice() != null) {
+            double iyzicoAmount = checkoutForm.getPaidPrice().doubleValue();
+            double expectedAmount = cs.totalAmount();
+            if (Math.abs(iyzicoAmount - expectedAmount) > 0.02) {
+                log.error("paidPrice mismatch! iyzico: {}, expected: {} (Token: {})", iyzicoAmount, expectedAmount, token);
+                throw new RuntimeException("Ödeme tutarı uyuşmazlığı tespit edildi.");
+            }
+        }
+
+        log.info("iyzico payment verified successfully. Token: {}, ConversationId: {}, Amount: {}", token, conversationId, cs.totalAmount());
 
         Order order = new Order();
         order.setName(str(body, "name"));
@@ -199,7 +231,16 @@ public class OrderService {
         order.setZipCode(str(body, "zipCode"));
         order.setShippingOption(str(body, "shippingOption"));
         order.setStatus("pending");
-        order.setUserId(user.getId().toString());
+        
+        if (user != null) {
+            order.setUserId(user.getId().toString());
+            order.setIsGuest(false);
+        } else {
+            order.setIsGuest(true);
+            order.setGuestEmail(str(body, "email"));
+            order.setGuestName(str(body, "name"));
+            order.setGuestPhone(str(body, "contact"));
+        }
 
         order.setSubTotal(cs.subTotal());
         order.setShippingCost(cs.shippingCost());
@@ -220,7 +261,23 @@ public class OrderService {
                 "paidPrice", checkoutForm.getPaidPrice() != null ? checkoutForm.getPaidPrice().toString() : ""
         )));
 
-        Order saved = orderRepository.save(order);
+        Order saved;
+        try {
+            saved = orderRepository.save(order);
+        } catch (DataIntegrityViolationException e) {
+            // Race condition: başka bir thread aynı token ile siparişi zaten kaydetmiş
+            log.warn("Duplicate iyzicoToken race condition caught for token: {}", token);
+            Optional<Order> duplicate = orderRepository.findByIyzicoToken(token);
+            if (duplicate.isPresent()) {
+                Order ex = duplicate.get();
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("success", true);
+                resp.put("orderId", ex.getId().toString());
+                resp.put("order", toResponse(ex));
+                return resp;
+            }
+            throw new RuntimeException("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
+        }
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("success", true);
@@ -302,6 +359,8 @@ public class OrderService {
         map.put("shippingOption", o.getShippingOption());
         map.put("status", o.getStatus());
         map.put("userId", o.getUserId());
+        map.put("isGuest", o.getIsGuest() != null && o.getIsGuest());
+        map.put("guestEmail", o.getGuestEmail());
         map.put("invoice", o.getInvoice());
         map.put("subTotal", o.getSubTotal());
         map.put("shippingCost", o.getShippingCost());
@@ -447,8 +506,13 @@ public class OrderService {
         String normalizedUserEmail = normalizeText(userEmail);
         String assignedUserEmail = normalizeText(coupon.getAssignedUserEmail());
 
-        if ("user".equals(scope) && !normalizedUserEmail.equals(assignedUserEmail)) {
-            throw new RuntimeException("Bu kupon yalnızca atanmış müşteri hesabında kullanılabilir.");
+        if ("user".equals(scope)) {
+            if (normalizedUserEmail.isEmpty() || "anonymoususer".equals(normalizedUserEmail)) {
+                throw new RuntimeException("Bu kuponu kullanmak için giriş yapmalısınız.");
+            }
+            if (!normalizedUserEmail.equals(assignedUserEmail)) {
+                throw new RuntimeException("Bu kupon yalnızca atanmış müşteri hesabında kullanılabilir.");
+            }
         }
 
         String status = normalizeText(coupon.getStatus());
@@ -604,7 +668,11 @@ public class OrderService {
                 .map(o -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("_id", o.getId().toString());
-                    m.put("name", o.getName() != null ? o.getName() : "");
+                    String displayName = o.getName();
+                    if ((displayName == null || displayName.isBlank()) && o.getIsGuest() != null && o.getIsGuest()) {
+                        displayName = o.getGuestName() != null ? o.getGuestName() : "Misafir";
+                    }
+                    m.put("name", displayName != null ? displayName : "");
                     m.put("totalAmount", o.getTotalAmount() != null ? o.getTotalAmount() : 0.0);
                     m.put("paymentMethod", "");
                     m.put("status", o.getStatus() != null ? o.getStatus() : "pending");
@@ -695,5 +763,14 @@ public class OrderService {
         return orders.stream()
                 .mapToDouble(o -> o.getTotalAmount() != null ? o.getTotalAmount() : 0.0)
                 .sum();
+    }
+
+    private String formatPhoneForIyzico(String phone) {
+        if (phone == null || phone.isBlank()) return "+905555555555";
+        String digits = phone.replaceAll("[^0-9]", "");
+        if (digits.length() < 10) return "+905555555555";
+        if (digits.startsWith("0")) digits = digits.substring(1);
+        if (digits.startsWith("90")) digits = digits.substring(2);
+        return "+90" + digits;
     }
 }

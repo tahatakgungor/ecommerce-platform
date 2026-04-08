@@ -27,8 +27,14 @@ public class Order {
     // pending | processing | delivered | cancelled
     private String status;
 
-    // müşterinin UUID string hali
+    // müşterinin UUID string hali (login'li kullanıcılar için)
     private String userId;
+
+    // Misafir alışverişi için alanlar
+    private String guestEmail;
+    private String guestName;
+    private String guestPhone;
+    private Boolean isGuest = false;
 
     // INV-xxxxxx
     private String invoice;
