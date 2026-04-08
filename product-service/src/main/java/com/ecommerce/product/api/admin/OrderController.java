@@ -2,6 +2,7 @@ package com.ecommerce.product.api.admin;
 
 import com.ecommerce.product.application.OrderService;
 import com.ecommerce.product.application.SecurityRateLimitService;
+import com.ecommerce.product.application.ActivityLogService;
 import com.ecommerce.product.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final SecurityRateLimitService rateLimitService;
+    private final ActivityLogService activityLogService;
 
     @Value("${app.security.payment.init-rate-limit.max-attempts:20}")
     private int initPaymentMaxAttempts;
@@ -72,9 +74,27 @@ public class OrderController {
         try {
             Map<String, Object> result = orderService.initializePayment(body, email, request);
             rateLimitService.clearFailures(limitKey);
+            activityLogService.log(
+                    "PAYMENT_INIT",
+                    "INFO",
+                    "Ödeme başlatma isteği başarılı.",
+                    email,
+                    "PAYMENT",
+                    null,
+                    Map.of("ip", clientIp, "fingerprint", fingerprint)
+            );
             return ResponseEntity.ok(result);
         } catch (RuntimeException ex) {
             rateLimitService.registerFailure(limitKey, window);
+            activityLogService.log(
+                    "PAYMENT_INIT",
+                    "WARN",
+                    "Ödeme başlatma isteği başarısız.",
+                    email,
+                    "PAYMENT",
+                    null,
+                    Map.of("ip", clientIp, "fingerprint", fingerprint, "error", ex.getMessage() != null ? ex.getMessage() : "N/A")
+            );
             throw ex;
         }
     }
@@ -102,9 +122,31 @@ public class OrderController {
         try {
             Map<String, Object> result = orderService.confirmPayment(body, email);
             rateLimitService.clearFailures(limitKey);
+            activityLogService.log(
+                    "PAYMENT_CONFIRM",
+                    "INFO",
+                    "Ödeme doğrulama başarılı.",
+                    email,
+                    "PAYMENT",
+                    token,
+                    Map.of("ip", clientIp, "conversationId", conversationId)
+            );
             return ResponseEntity.ok(result);
         } catch (RuntimeException ex) {
             rateLimitService.registerFailure(limitKey, window);
+            activityLogService.log(
+                    "PAYMENT_CONFIRM",
+                    "WARN",
+                    "Ödeme doğrulama başarısız.",
+                    email,
+                    "PAYMENT",
+                    token,
+                    Map.of(
+                            "ip", clientIp,
+                            "conversationId", conversationId,
+                            "error", ex.getMessage() != null ? ex.getMessage() : "N/A"
+                    )
+            );
             throw ex;
         }
     }
@@ -156,11 +198,29 @@ public class OrderController {
         try {
             Map<String, Object> result = orderService.getOrderByInvoiceAndEmail(invoice, email);
             rateLimitService.clearFailures(limitKey);
+            activityLogService.log(
+                    "ORDER_LOOKUP",
+                    "INFO",
+                    "Misafir sipariş sorgulaması başarılı.",
+                    normalizedEmail,
+                    "ORDER",
+                    invoice,
+                    Map.of("ip", clientIp)
+            );
             return ResponseEntity.ok(new ApiResponse<>(true, result, null));
         } catch (RuntimeException ex) {
             rateLimitService.registerFailure(limitKey, window);
             log.warn("[Security][OrderLookup] invoice={} email={} ip={} message={}",
                     invoice, normalizedEmail, clientIp, ex.getMessage());
+            activityLogService.log(
+                    "ORDER_LOOKUP",
+                    "WARN",
+                    "Misafir sipariş sorgulaması başarısız.",
+                    normalizedEmail,
+                    "ORDER",
+                    invoice,
+                    Map.of("ip", clientIp, "error", ex.getMessage() != null ? ex.getMessage() : "N/A")
+            );
             throw new RuntimeException("Sipariş bulunamadı.");
         }
     }

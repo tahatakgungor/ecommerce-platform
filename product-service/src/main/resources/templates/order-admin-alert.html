@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni Sipariş Bildirimi</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f5f7fb; font-family: Arial, sans-serif; color: #1f2937; }
+        .container { max-width: 620px; margin: 20px auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+        .header { background: #0f172a; color: #fff; padding: 20px; }
+        .header h1 { margin: 0; font-size: 20px; }
+        .content { padding: 20px; }
+        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; }
+        .row { margin: 0 0 8px; font-size: 14px; }
+        .label { color: #64748b; font-weight: 700; display: inline-block; min-width: 120px; }
+        .value { color: #111827; font-weight: 600; }
+        .footer { padding: 14px 20px; font-size: 12px; color: #6b7280; background: #f8fafc; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Yeni Sipariş Alındı</h1>
+    </div>
+    <div class="content">
+        <div class="card">
+            <p class="row"><span class="label">Sipariş No:</span> <span class="value" th:text="${order.invoice}">INV-123456</span></p>
+            <p class="row"><span class="label">Müşteri:</span> <span class="value" th:text="${order.name != null ? order.name : order.guestName}">Müşteri</span></p>
+            <p class="row"><span class="label">E-posta:</span> <span class="value" th:text="${order.email != null ? order.email : order.guestEmail}">customer@example.com</span></p>
+            <p class="row"><span class="label">Tutar:</span> <span class="value" th:text="${order.totalAmount + ' TL'}">0 TL</span></p>
+            <p class="row"><span class="label">Tarih:</span> <span class="value" th:text="${order.createdAt}">2026-01-01T10:00</span></p>
+            <p class="row"><span class="label">Durum:</span> <span class="value" th:text="${order.status}">pending</span></p>
+        </div>
+    </div>
+    <div class="footer">
+        Bu bildirim sistem tarafından otomatik gönderilmiştir.
+    </div>
+</div>
+</body>
+</html>

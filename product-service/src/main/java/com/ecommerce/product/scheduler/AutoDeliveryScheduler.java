@@ -1,6 +1,7 @@
 package com.ecommerce.product.scheduler;
 
 import com.ecommerce.product.application.EmailService;
+import com.ecommerce.product.application.ActivityLogService;
 import com.ecommerce.product.domain.Order;
 import com.ecommerce.product.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class AutoDeliveryScheduler {
 
     private final OrderRepository orderRepository;
     private final EmailService emailService;
+    private final ActivityLogService activityLogService;
 
     @Value("${app.shipping.auto-deliver-days:10}")
     private int autoDeliverDays;
@@ -63,6 +65,15 @@ public class AutoDeliveryScheduler {
 
                 // Müşteriye teslim edildi bildirimi gönder
                 sendDeliveryNotification(order);
+                activityLogService.log(
+                        "ORDER_DELIVERED_AUTO",
+                        "INFO",
+                        "Sipariş otomatik olarak delivered durumuna alındı.",
+                        "scheduler",
+                        "ORDER",
+                        order.getId() != null ? order.getId().toString() : null,
+                        java.util.Map.of("invoice", order.getInvoice() != null ? order.getInvoice() : "")
+                );
 
                 log.info("AutoDelivery: Sipariş {} → delivered. ({})",
                         order.getInvoice(), order.getShippingCarrier());

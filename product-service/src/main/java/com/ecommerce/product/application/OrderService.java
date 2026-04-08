@@ -48,6 +48,7 @@ public class OrderService {
     private final UserRepository userRepository;
     private final ProductRepository productRepository;
     private final CouponRepository couponRepository;
+    private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper;
     private final Options iyzicoOptions;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -254,6 +255,15 @@ public class OrderService {
                 resp.put("success", true);
                 resp.put("orderId", ex.getId().toString());
                 resp.put("order", toResponse(ex));
+                activityLogService.log(
+                        "PAYMENT_REPLAY",
+                        "INFO",
+                        "Aynı conversationId ile tekrar ödeme isteği idempotent döndü.",
+                        email,
+                        "ORDER",
+                        ex.getId() != null ? ex.getId().toString() : null,
+                        Map.of("conversationId", conversationId)
+                );
                 return resp;
             }
         }
@@ -273,6 +283,15 @@ public class OrderService {
                 resp.put("order", toResponse(ex));
                 log.info("[PaymentSecurity] Replay detected by token. Returning existing order. token={}, orderId={}",
                         token, ex.getId());
+                activityLogService.log(
+                        "PAYMENT_REPLAY",
+                        "INFO",
+                        "Aynı token ile tekrar ödeme isteği idempotent döndü.",
+                        email,
+                        "ORDER",
+                        ex.getId() != null ? ex.getId().toString() : null,
+                        Map.of("token", token)
+                );
                 return resp;
             }
         }
@@ -309,6 +328,15 @@ public class OrderService {
             log.warn("[PaymentSecurity] Draft order not found. token={}, conversationId={}, fallbackMode={}",
                     token, iyzicoConvId, paymentConfirmFallbackMode);
             if (isFallbackBlocked()) {
+                activityLogService.log(
+                        "PAYMENT_CONFIRM",
+                        "WARN",
+                        "Sipariş taslağı bulunamadı ve fallback engellendi.",
+                        email,
+                        "PAYMENT",
+                        token,
+                        Map.of("conversationId", iyzicoConvId != null ? iyzicoConvId : "")
+                );
                 throw new RuntimeException("Ödeme doğrulanamadı. Sipariş taslağı bulunamadı.");
             }
 
@@ -356,6 +384,15 @@ public class OrderService {
             if (Math.abs(iyzicoAmount - dbAmount) > 0.1) {
                 log.error("[PaymentSecurity] Amount mismatch! Iyzico: {}, DB: {}, token={}, conversationId={}, orderId={}",
                         iyzicoAmount, dbAmount, token, conversationId, order.getId());
+                activityLogService.log(
+                        "PAYMENT_CONFIRM",
+                        "ERROR",
+                        "Ödeme tutarı uyuşmazlığı tespit edildi.",
+                        email,
+                        "ORDER",
+                        order.getId() != null ? order.getId().toString() : null,
+                        Map.of("token", token, "conversationId", conversationId)
+                );
                 throw new RuntimeException("Ödeme tutarı uyuşmazlığı tespit edildi.");
             }
         }
@@ -406,6 +443,19 @@ public class OrderService {
             log.warn("Failed to publish OrderPlacedEvent: {}", e.getMessage());
         }
 
+        activityLogService.log(
+                "ORDER_CREATED",
+                "INFO",
+                "Yeni sipariş başarıyla oluşturuldu.",
+                email,
+                "ORDER",
+                saved.getId() != null ? saved.getId().toString() : null,
+                Map.of(
+                        "invoice", saved.getInvoice() != null ? saved.getInvoice() : "",
+                        "status", saved.getStatus() != null ? saved.getStatus() : ""
+                )
+        );
+
         return response;
     }
 
@@ -448,8 +498,12 @@ public class OrderService {
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
 
         // If authenticated, check ownership
-        if (email != null) {
-            if (!order.getEmail().equals(email) && !order.getUserId().equals(email)) {
+        if (email != null && !email.isBlank()) {
+            String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+            String orderEmail = order.getEmail() != null ? order.getEmail().trim().toLowerCase(Locale.ROOT) : "";
+            String guestEmail = order.getGuestEmail() != null ? order.getGuestEmail().trim().toLowerCase(Locale.ROOT) : "";
+            boolean canAccess = normalizedEmail.equals(orderEmail) || normalizedEmail.equals(guestEmail);
+            if (!canAccess) {
                 throw new RuntimeException("Bu siparişi görüntüleme yetkiniz yok.");
             }
         } 
@@ -459,7 +513,9 @@ public class OrderService {
     }
 
     public Map<String, Object> getOrderByInvoiceAndEmail(String invoice, String email) {
-        Order order = orderRepository.findByInvoiceAndEmail(invoice, email)
+        String safeInvoice = invoice == null ? "" : invoice.trim();
+        String safeEmail = email == null ? "" : email.trim();
+        Order order = orderRepository.findByInvoiceAndEmailIgnoreCase(safeInvoice, safeEmail)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı veya e-posta eşleşmiyor."));
         return Map.of("order", toResponse(order));
     }
@@ -482,8 +538,24 @@ public class OrderService {
     public Map<String, Object> updateOrderStatus(UUID id, String status) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
-        order.setStatus(status);
-        return Map.of("order", toResponse(orderRepository.save(order)));
+        String normalizedStatus = status == null ? "" : status.trim().toLowerCase(Locale.ROOT);
+        if (normalizedStatus.isBlank()) {
+            throw new RuntimeException("Sipariş durumu boş olamaz.");
+        }
+        if ("cancel".equals(normalizedStatus)) normalizedStatus = "cancelled";
+
+        order.setStatus(normalizedStatus);
+        Order saved = orderRepository.save(order);
+        activityLogService.log(
+                "ORDER_STATUS_UPDATED",
+                "INFO",
+                "Sipariş durumu güncellendi.",
+                "admin",
+                "ORDER",
+                saved.getId() != null ? saved.getId().toString() : null,
+                Map.of("status", normalizedStatus)
+        );
+        return Map.of("order", toResponse(saved));
     }
 
     // ---------- Kargo Yönetimi ----------
@@ -493,13 +565,19 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
 
+        String safeCarrier = carrier == null ? "" : carrier.trim();
+        String safeTracking = trackingNumber == null ? "" : trackingNumber.trim().replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
+        if (safeCarrier.isBlank() || safeTracking.length() < 5) {
+            throw new RuntimeException("Geçerli kargo firması ve takip numarası gereklidir.");
+        }
+
         order.setStatus("shipped");
-        order.setShippingCarrier(carrier);
-        order.setTrackingNumber(trackingNumber);
+        order.setShippingCarrier(safeCarrier);
+        order.setTrackingNumber(safeTracking);
         order.setShippedAt(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
 
         Order saved = orderRepository.save(order);
-        log.info("Order {} marked as shipped. Carrier: {}, Tracking: {}", id, carrier, trackingNumber);
+        log.info("Order {} marked as shipped. Carrier: {}, Tracking: {}", id, safeCarrier, safeTracking);
 
         // Bildirim gönder
         try {
@@ -507,6 +585,20 @@ public class OrderService {
         } catch (Exception e) {
             log.warn("Failed to publish OrderShippedEvent: {}", e.getMessage());
         }
+
+        activityLogService.log(
+                "ORDER_SHIPPED",
+                "INFO",
+                "Sipariş kargoya verildi.",
+                "admin",
+                "ORDER",
+                saved.getId() != null ? saved.getId().toString() : null,
+                Map.of(
+                        "carrier", safeCarrier,
+                        "trackingNumber", safeTracking,
+                        "invoice", saved.getInvoice() != null ? saved.getInvoice() : ""
+                )
+        );
 
         return Map.of("order", toResponse(saved));
     }

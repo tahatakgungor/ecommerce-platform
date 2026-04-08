@@ -50,6 +50,8 @@ app:
       api-key: ${RESEND_API_KEY:}
       from-email: ${RESEND_FROM_EMAIL:}
       reply-to: ${RESEND_REPLY_TO:}
+      max-attempts: ${RESEND_MAX_ATTEMPTS:2}
+    order-alert-recipients: ${ORDER_ALERT_RECIPIENTS:}
   iyzico:
     api-key: ${IYZICO_API_KEY:}
     secret-key: ${IYZICO_SECRET_KEY:}

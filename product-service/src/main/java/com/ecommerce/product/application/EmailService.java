@@ -18,6 +18,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,9 @@ public class EmailService {
 
     @Value("${app.mail.resend.max-attempts:2}")
     private int resendMaxAttempts;
+
+    @Value("${app.mail.order-alert-recipients:}")
+    private String orderAlertRecipients;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
@@ -182,6 +186,38 @@ public class EmailService {
             sendEmail(to, "Siparişiniz Teslim Edildi - SERRAVİT", null, htmlContent, null, "Teslim bildirimi e-postası");
         } catch (Exception e) {
             log.error("Teslim bildirimi e-postası gönderilemedi: {}", e.getMessage());
+        }
+    }
+
+    public void sendNewOrderAlertToAdmins(Order order) {
+        List<String> recipients = Arrays.stream((orderAlertRecipients == null ? "" : orderAlertRecipients).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .toList();
+
+        if (recipients.isEmpty()) {
+            String fallback = (replyToEmail != null && !replyToEmail.isBlank()) ? replyToEmail : fromEmail;
+            if (fallback == null || fallback.isBlank()) return;
+            recipients = List.of(fallback);
+        }
+
+        for (String to : recipients) {
+            try {
+                Context context = new Context();
+                context.setVariable("order", order);
+                String htmlContent = templateEngine.process("order-admin-alert", context);
+                sendEmail(
+                        to,
+                        "Yeni Sipariş Alındı - " + (order.getInvoice() != null ? order.getInvoice() : "SERRAVIT"),
+                        null,
+                        htmlContent,
+                        null,
+                        "Yeni sipariş admin bildirimi"
+                );
+            } catch (Exception e) {
+                log.error("Yeni sipariş admin bildirimi gönderilemedi ({}): {}", to, e.getMessage());
+            }
         }
     }
 

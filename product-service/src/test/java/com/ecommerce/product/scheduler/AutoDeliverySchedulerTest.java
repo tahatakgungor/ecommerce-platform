@@ -1,6 +1,7 @@
 package com.ecommerce.product.scheduler;
 
 import com.ecommerce.product.application.EmailService;
+import com.ecommerce.product.application.ActivityLogService;
 import com.ecommerce.product.domain.Order;
 import com.ecommerce.product.repository.OrderRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,11 +31,14 @@ class AutoDeliverySchedulerTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private ActivityLogService activityLogService;
+
     private AutoDeliveryScheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        scheduler = new AutoDeliveryScheduler(orderRepository, emailService);
+        scheduler = new AutoDeliveryScheduler(orderRepository, emailService, activityLogService);
         ReflectionTestUtils.setField(scheduler, "autoDeliverDays", 10);
     }
 

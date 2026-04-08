@@ -128,7 +128,7 @@ public class SecurityConfig {
                         // Payment endpoints - public (guests)
                         .requestMatchers("/api/order/initialize-payment").permitAll()
                         .requestMatchers("/api/order/confirm-payment").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/user-order/single-order/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/order/lookup").permitAll()
                         // Static dosyalar
                         .requestMatchers("/uploads/**").permitAll()
                         // Geri kalan her şey authentication gerektirir
