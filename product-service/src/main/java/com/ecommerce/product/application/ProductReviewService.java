@@ -48,6 +48,7 @@ public class ProductReviewService {
 
         Optional<ProductReview> existingReview = productReviewRepository.findByProductIdAndUserId(productId, user.getId());
         ProductReview review = existingReview.orElseGet(ProductReview::new);
+        boolean isNewReview = existingReview.isEmpty();
         review.setProduct(product);
         review.setUser(user);
         review.setRating(request.getRating());
@@ -56,11 +57,17 @@ public class ProductReviewService {
         review.setStatus(resolveInitialStatus(review));
         review.setVerifiedPurchase(true);
         review.setMediaUrls(writeMediaUrls(sanitizeMediaUrls(request.getMediaUrls())));
-        review.setHelpfulCount(0L);
-        review.setNotHelpfulCount(0L);
+        if (isNewReview) {
+            review.setHelpfulCount(0L);
+            review.setNotHelpfulCount(0L);
+        }
 
         ProductReview saved = productReviewRepository.save(review);
-        markProductAsReviewedForOrder(orderId, user.getId(), productId);
+        UUID effectiveOrderId = orderId;
+        if (effectiveOrderId == null) {
+            effectiveOrderId = resolveEligibleOrder(user.getId(), null, productId).map(Order::getId).orElse(null);
+        }
+        markProductAsReviewedForOrder(effectiveOrderId, user.getId(), productId);
         return toResponse(saved);
     }
 
