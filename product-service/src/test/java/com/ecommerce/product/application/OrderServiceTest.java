@@ -102,7 +102,8 @@ class OrderServiceTest {
         when(userRepository.findByEmail("customer@mail.com")).thenReturn(Optional.of(user));
         when(productRepository.findById(productId)).thenReturn(Optional.of(product));
         when(couponRepository.findByCouponCodeIgnoreCase("VIP20")).thenReturn(Optional.of(coupon));
-        when(orderRepository.findByIyzicoToken("iyzico-test-token")).thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc("test-conversation-id")).thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc("iyzico-test-token")).thenReturn(Optional.empty());
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
             order.setId(UUID.randomUUID());
@@ -186,7 +187,8 @@ class OrderServiceTest {
         body.put("couponCode", "VIP20");
         body.put("cart", List.of(Map.of("_id", productId.toString(), "orderQuantity", 1)));
 
-        when(orderRepository.findByIyzicoToken("iyzico-test-token-2")).thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc("test-conv-2")).thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc("iyzico-test-token-2")).thenReturn(Optional.empty());
         when(userRepository.findByEmail("another@mail.com")).thenReturn(Optional.of(user));
         when(couponRepository.findByCouponCodeIgnoreCase("VIP20")).thenReturn(Optional.of(coupon));
 
@@ -215,7 +217,8 @@ class OrderServiceTest {
         body.put("conversationId", "expected-conv-id");
         body.put("cart", List.of()); // Just to bypass early null checks if any, though token comes first.
 
-        when(orderRepository.findByIyzicoToken("iyzico-test-token-mismatch")).thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc("expected-conv-id")).thenReturn(Optional.empty());
+        when(orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc("iyzico-test-token-mismatch")).thenReturn(Optional.empty());
 
         CheckoutForm mockForm = mock(CheckoutForm.class);
         when(mockForm.getStatus()).thenReturn("success");

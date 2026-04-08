@@ -14,7 +14,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByCreatedAtAfter(LocalDateTime date);
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByStatusIgnoreCase(String status);
-    Optional<Order> findByIyzicoToken(String iyzicoToken);
-    Optional<Order> findByIyzicoConversationId(String iyzicoConversationId);
+    Optional<Order> findTopByIyzicoTokenOrderByCreatedAtDesc(String iyzicoToken);
+    Optional<Order> findTopByIyzicoConversationIdOrderByCreatedAtDesc(String iyzicoConversationId);
     Optional<Order> findByInvoiceAndEmail(String invoice, String email);
 }

@@ -162,6 +162,22 @@ public class OrderService {
             throw new RuntimeException("Ödeme başlatılamadı: " + result.getErrorMessage());
         }
 
+        // --- Self-Healing: Eskiden kalmış çöp taslakları temizle (tek seferlik değil, düzenli temizlik) ---
+        try {
+            LocalDateTime oneHourAgo = LocalDateTime.now(ZoneId.of("Europe/Istanbul")).minusHours(1);
+            List<Order> staleDrafts = orderRepository.findByStatusIgnoreCase("waiting_payment")
+                    .stream()
+                    .filter(o -> o.getCreatedAt() != null && o.getCreatedAt().isBefore(oneHourAgo))
+                    .filter(o -> o.getIyzicoToken() == null)
+                    .toList();
+            if (!staleDrafts.isEmpty()) {
+                orderRepository.deleteAll(staleDrafts);
+                log.info("Cleaned up {} stale draft orders.", staleDrafts.size());
+            }
+        } catch (Exception e) {
+            log.warn("Auto-cleanup failed: {}", e.getMessage());
+        }
+
         // Siparişi "waiting_payment" durumunda veritabanına kaydet (Draft)
         Order order = new Order();
         order.setIyzicoConversationId(conversationId);
@@ -220,7 +236,10 @@ public class OrderService {
         }
 
         // Idempotency: aynı token ile veya conversationId ile zaten onaylanmış mı?
-        Optional<Order> existing = orderRepository.findByIyzicoToken(token);
+        Optional<Order> existing = (token != null && !token.isBlank()) 
+                ? orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc(token) 
+                : Optional.empty();
+
         if (existing.isPresent()) {
             Order ex = existing.get();
             if (!"waiting_payment".equals(ex.getStatus())) {
@@ -251,8 +270,16 @@ public class OrderService {
 
         // Taslak siparişi bul (waiting_payment)
         String iyzicoConvId = checkoutForm.getConversationId();
-        Order order = orderRepository.findByIyzicoConversationId(iyzicoConvId)
-                .orElse(orderRepository.findByIyzicoToken(token).orElse(null));
+        
+        Optional<Order> orderLookup = Optional.empty();
+        if (iyzicoConvId != null && !iyzicoConvId.isBlank()) {
+            orderLookup = orderRepository.findTopByIyzicoConversationIdOrderByCreatedAtDesc(iyzicoConvId);
+        }
+        if (orderLookup.isEmpty() && token != null && !token.isBlank()) {
+            orderLookup = orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc(token);
+        }
+
+        Order order = orderLookup.orElse(null);
 
         if (order == null) {
             log.warn("Draft order not found for conversationId: {}. Attempting to create new order from body.", iyzicoConvId);
@@ -321,7 +348,7 @@ public class OrderService {
         } catch (DataIntegrityViolationException e) {
             // Race condition: başka bir thread aynı token ile siparişi zaten kaydetmiş
             log.warn("Duplicate iyzicoToken race condition caught for token: {}", token);
-            Optional<Order> duplicate = orderRepository.findByIyzicoToken(token);
+            Optional<Order> duplicate = orderRepository.findTopByIyzicoTokenOrderByCreatedAtDesc(token);
             if (duplicate.isPresent()) {
                 Order ex = duplicate.get();
                 Map<String, Object> resp = new LinkedHashMap<>();
