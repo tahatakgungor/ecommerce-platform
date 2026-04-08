@@ -325,10 +325,14 @@ public class OrderService {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
 
-        if (!order.getEmail().equals(email) && !order.getUserId().equals(email)) {
-            // Check if it's the user's order
-            throw new RuntimeException("Bu siparişi görüntüleme yetkiniz yok.");
-        }
+        // If authenticated, check ownership
+        if (email != null) {
+            if (!order.getEmail().equals(email) && !order.getUserId().equals(email)) {
+                throw new RuntimeException("Bu siparişi görüntüleme yetkiniz yok.");
+            }
+        } 
+        // If guest, we allow viewing by UUID (Security by Obscurity via non-enumerable IDs)
+        
         return Map.of("order", toResponse(order));
     }
 

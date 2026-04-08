@@ -26,7 +26,8 @@ public class UserOrderController {
     // Tek sipariş detayı (fatura sayfası)
     @GetMapping("/single-order/{id}")
     public ResponseEntity<?> getSingleOrder(@PathVariable UUID id, Authentication auth) {
-        Map<String, Object> result = orderService.getSingleOrderForUser(auth.getName(), id);
+        String email = (auth != null) ? auth.getName() : null;
+        Map<String, Object> result = orderService.getSingleOrderForUser(email, id);
         return ResponseEntity.ok(result);
     }
 }
