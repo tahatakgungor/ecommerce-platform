@@ -86,6 +86,7 @@ public class SecurityConfig {
                                 "/api/user/confirmEmail/**",
                                 "/api/user/forget-password",
                                 "/api/user/confirm-forget-password",
+                                "/api/user/update-user",
                                 "/api/contact/send",
                                 "/api/user/newsletter"
                         ))

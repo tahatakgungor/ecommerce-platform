@@ -66,7 +66,7 @@ public class OrderController {
     // Misafir sipariş sorgulama
     @GetMapping("/lookup")
     public ResponseEntity<?> lookupOrder(
-            @RequestParam int invoice,
+            @RequestParam String invoice,
             @RequestParam String email) {
         Map<String, Object> result = orderService.getOrderByInvoiceAndEmail(invoice, email);
         return ResponseEntity.ok(new ApiResponse<>(true, result, null));

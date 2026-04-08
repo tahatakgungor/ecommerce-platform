@@ -332,7 +332,7 @@ public class OrderService {
         return Map.of("order", toResponse(order));
     }
 
-    public Map<String, Object> getOrderByInvoiceAndEmail(int invoice, String email) {
+    public Map<String, Object> getOrderByInvoiceAndEmail(String invoice, String email) {
         Order order = orderRepository.findByInvoiceAndEmail(invoice, email)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı veya e-posta eşleşmiyor."));
         return Map.of("order", toResponse(order));
