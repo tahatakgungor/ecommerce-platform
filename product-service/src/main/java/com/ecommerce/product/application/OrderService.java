@@ -196,8 +196,8 @@ public class OrderService {
         order.setShippingCost(cs.shippingCost());
         order.setDiscount(cs.discountAmount());
         order.setTotalAmount(cs.totalAmount());
-        order.setCouponCode(cs.couponCode());
         order.setCouponTitle(cs.couponTitle());
+        order.setIyzicoToken(result.getToken());
         
         orderRepository.save(order);
         log.info("Draft order saved for conversationId: {}. Status: waiting_payment", conversationId);
