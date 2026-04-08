@@ -34,7 +34,18 @@
             <p>Siparişinizi takip etmek için kargo firmasının web sitesini kullanabilir veya aşağıdaki butona tıklayabilirsiniz.</p>
             
             <div style="text-align: center;">
-                <a href="#" class="btn">Kargomu Takip Et</a>
+                <th:block th:with="carrier=${order.shippingCarrier != null ? order.shippingCarrier.toLowerCase() : ''},
+                                   no=${order.trackingNumber != null ? order.trackingNumber : ''},
+                                   trackUrl=${carrier.contains('aras') ? 'https://kargotakip.araskargo.com.tr/mainpage.aspx?code=' + no :
+                                             (carrier.contains('yurt') ? 'https://www.yurticikargo.com/tr/online-islemler/gonderi-sorgula?code=' + no :
+                                             (carrier.contains('mng') ? 'https://www.mngkargo.com.tr/gonderi-sorgula?code=' + no :
+                                             (carrier.contains('ptt') ? 'https://www.ptt.gov.tr/tr/gonderi-sorgula?barcode=' + no :
+                                             (carrier.contains('s') and carrier.contains('rat') ? 'https://www.suratkargo.com.tr/KargoTakip/Index?code=' + no :
+                                             (carrier.contains('ups') ? 'https://www.ups.com/track?tracknum=' + no :
+                                             (carrier.contains('dhl') ? 'https://www.dhl.com/tr-tr/home/tracking.html?tracking-id=' + no :
+                                             'https://www.google.com/search?q=' + no + '+kargo+takip')))))))}">
+                    <a th:href="${trackUrl}" class="btn" style="display:inline-block;padding:15px 30px;background-color:#198754;color:white;text-decoration:none;border-radius:5px;font-weight:bold;">Kargomu Takip Et →</a>
+                </th:block>
             </div>
 
             <div class="order-summary">
