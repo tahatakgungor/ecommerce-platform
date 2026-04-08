@@ -155,21 +155,58 @@ public class OrderService {
         request.setBasketItems(basketItems);
 
         CheckoutFormInitialize result = CheckoutFormInitialize.create(request, iyzicoOptions);
+        log.info("Iyzico initialize request sent. Status: {}, Token: {}", result.getStatus(), result.getToken());
 
         if (!"success".equals(result.getStatus())) {
             log.error("iyzico init failed [{}]: {}", result.getErrorCode(), result.getErrorMessage());
             throw new RuntimeException("Ödeme başlatılamadı: " + result.getErrorMessage());
         }
 
+        // Siparişi "waiting_payment" durumunda veritabanına kaydet (Draft)
+        Order order = new Order();
+        order.setIyzicoConversationId(conversationId);
+        order.setStatus("waiting_payment");
+        
+        order.setName(str(body, "name"));
+        order.setAddress(str(body, "address"));
+        order.setContact(str(body, "contact"));
+        order.setEmail(str(body, "email"));
+        order.setCity(city);
+        order.setCountry(country);
+        order.setZipCode(str(body, "zipCode"));
+        order.setShippingOption(str(body, "shippingOption"));
+        
+        if (user != null) {
+            order.setUserId(user.getId().toString());
+            order.setIsGuest(false);
+        } else {
+            order.setIsGuest(true);
+            order.setGuestEmail(str(body, "email"));
+            order.setGuestName(str(body, "name"));
+            order.setGuestPhone(str(body, "contact"));
+        }
+        
+        try {
+            order.setCart(objectMapper.writeValueAsString(cs.sanitizedCart()));
+        } catch (Exception e) {
+            log.error("Cart serialization error for draft order: {}", e.getMessage());
+        }
+        
+        order.setSubTotal(cs.subTotal());
+        order.setShippingCost(cs.shippingCost());
+        order.setDiscount(cs.discountAmount());
+        order.setTotalAmount(cs.totalAmount());
+        order.setCouponCode(cs.couponCode());
+        order.setCouponTitle(cs.couponTitle());
+        
+        orderRepository.save(order);
+        log.info("Draft order saved for conversationId: {}. Status: waiting_payment", conversationId);
+
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("checkoutFormContent", result.getCheckoutFormContent());
         response.put("paymentPageUrl", result.getPaymentPageUrl());
         response.put("token", result.getToken());
         response.put("conversationId", conversationId);
-        response.put("subTotal", formatAmount(cs.subTotal()));
-        response.put("shippingCost", formatAmount(cs.shippingCost()));
-        response.put("discount", formatAmount(cs.discountAmount()));
-        response.put("totalAmount", formatAmount(cs.totalAmount()));
         return response;
     }
 
@@ -182,15 +219,18 @@ public class OrderService {
             throw new RuntimeException("Ödeme token'ı eksik.");
         }
 
-        // Idempotency: aynı token ile tekrar sipariş oluşturma
+        // Idempotency: aynı token ile veya conversationId ile zaten onaylanmış mı?
         Optional<Order> existing = orderRepository.findByIyzicoToken(token);
         if (existing.isPresent()) {
             Order ex = existing.get();
-            Map<String, Object> resp = new LinkedHashMap<>();
-            resp.put("success", true);
-            resp.put("orderId", ex.getId().toString());
-            resp.put("order", toResponse(ex));
-            return resp;
+            if (!"waiting_payment".equals(ex.getStatus())) {
+                log.info("Order already confirmed for token: {}. Returning existing record.", token);
+                Map<String, Object> resp = new LinkedHashMap<>();
+                resp.put("success", true);
+                resp.put("orderId", ex.getId().toString());
+                resp.put("order", toResponse(ex));
+                return resp;
+            }
         }
 
         String conversationId = str(body, "conversationId");
@@ -199,6 +239,7 @@ public class OrderService {
         retrieveRequest.setConversationId(conversationId);
         retrieveRequest.setToken(token);
 
+        log.info("Retrieving iyzico checkout form. Token: {}, ConversationId: {}", token, conversationId);
         CheckoutForm checkoutForm = CheckoutForm.retrieve(retrieveRequest, iyzicoOptions);
 
         if (!"success".equals(checkoutForm.getStatus()) || !"SUCCESS".equals(checkoutForm.getPaymentStatus())) {
@@ -208,60 +249,61 @@ public class OrderService {
                     (checkoutForm.getErrorMessage() != null ? checkoutForm.getErrorMessage() : checkoutForm.getPaymentStatus()));
         }
 
-        if (checkoutForm.getConversationId() == null || !checkoutForm.getConversationId().equals(conversationId)) {
-            log.error("iyzico conversationId mismatch! Expected: {}, Received: {} (Token: {})", 
-                      conversationId, checkoutForm.getConversationId(), token);
-            throw new RuntimeException("Ödeme doğrulanamadı: Güvenlik ihlali (Geçersiz ConversationId).");
+        // Taslak siparişi bul (waiting_payment)
+        String iyzicoConvId = checkoutForm.getConversationId();
+        Order order = orderRepository.findByIyzicoConversationId(iyzicoConvId)
+                .orElse(orderRepository.findByIyzicoToken(token).orElse(null));
+
+        if (order == null) {
+            log.warn("Draft order not found for conversationId: {}. Attempting to create new order from body.", iyzicoConvId);
+            order = new Order();
+            // Fallback: Eskiden olduğu gibi body içinden doldur (geçiş sürecinde hata almamak için)
+            order.setName(str(body, "name"));
+            order.setAddress(str(body, "address"));
+            order.setContact(str(body, "contact"));
+            order.setEmail(str(body, "email"));
+            order.setCity(str(body, "city"));
+            order.setCountry(str(body, "country"));
+            order.setZipCode(str(body, "zipCode"));
+            order.setShippingOption(str(body, "shippingOption"));
+            
+            User user = null;
+            if (email != null && !email.isBlank() && !"anonymousUser".equals(email)) {
+                user = userRepository.findByEmail(email).orElse(null);
+            }
+            if (user != null) {
+                order.setUserId(user.getId().toString());
+                order.setIsGuest(false);
+            } else {
+                order.setIsGuest(true);
+                order.setGuestEmail(str(body, "email"));
+                order.setGuestName(str(body, "name"));
+                order.setGuestPhone(str(body, "contact"));
+            }
+            
+            CheckoutSummary cs = calculateCheckout(body, email);
+            order.setSubTotal(cs.subTotal());
+            order.setShippingCost(cs.shippingCost());
+            order.setDiscount(cs.discountAmount());
+            order.setTotalAmount(cs.totalAmount());
+            order.setCouponCode(cs.couponCode());
+            order.setCouponTitle(cs.couponTitle());
+            order.setCart(toJson(cs.sanitizedCart()));
+        } else {
+            log.info("Found draft order for conversationId: {}. ID: {}", iyzicoConvId, order.getId());
         }
 
-        // paidPrice cross-check: iyzico'dan dönen tutarla backend hesabını karşılaştır
-        User user = null;
-        if (email != null && !email.isBlank() && !"anonymousUser".equals(email)) {
-            user = userRepository.findByEmail(email).orElse(null);
-        }
-        
-        CheckoutSummary cs = calculateCheckout(body, email);
-
-        if (checkoutForm.getPaidPrice() != null) {
+        // Tutar kontrolü (opsiyonel ama güvenli)
+        if (checkoutForm.getPaidPrice() != null && order.getTotalAmount() != null) {
             double iyzicoAmount = checkoutForm.getPaidPrice().doubleValue();
-            double expectedAmount = cs.totalAmount();
-            if (Math.abs(iyzicoAmount - expectedAmount) > 0.02) {
-                log.error("paidPrice mismatch! iyzico: {}, expected: {} (Token: {})", iyzicoAmount, expectedAmount, token);
+            double dbAmount = order.getTotalAmount();
+            if (Math.abs(iyzicoAmount - dbAmount) > 0.1) {
+                log.error("Amount mismatch! Iyzico: {}, DB: {} (OrderID: {})", iyzicoAmount, dbAmount, order.getId());
                 throw new RuntimeException("Ödeme tutarı uyuşmazlığı tespit edildi.");
             }
         }
 
-        log.info("iyzico payment verified successfully. Token: {}, ConversationId: {}, Amount: {}", token, conversationId, cs.totalAmount());
-
-        Order order = new Order();
-        order.setName(str(body, "name"));
-        order.setAddress(str(body, "address"));
-        order.setContact(str(body, "contact"));
-        order.setEmail(str(body, "email"));
-        order.setCity(str(body, "city"));
-        order.setCountry(str(body, "country"));
-        order.setZipCode(str(body, "zipCode"));
-        order.setShippingOption(str(body, "shippingOption"));
         order.setStatus("pending");
-        
-        if (user != null) {
-            order.setUserId(user.getId().toString());
-            order.setIsGuest(false);
-        } else {
-            order.setIsGuest(true);
-            order.setGuestEmail(str(body, "email"));
-            order.setGuestName(str(body, "name"));
-            order.setGuestPhone(str(body, "contact"));
-        }
-
-        order.setSubTotal(cs.subTotal());
-        order.setShippingCost(cs.shippingCost());
-        order.setDiscount(cs.discountAmount());
-        order.setTotalAmount(cs.totalAmount());
-        order.setCouponCode(cs.couponCode());
-        order.setCouponTitle(cs.couponTitle());
-
-        order.setCart(toJson(cs.sanitizedCart()));
         order.setIyzicoToken(token);
         order.setIyzicoConversationId(checkoutForm.getConversationId());
         order.setIyzicoPaymentId(checkoutForm.getPaymentId());
@@ -307,6 +349,7 @@ public class OrderService {
         List<Map<String, Object>> orders = orderRepository
                 .findByUserIdOrderByCreatedAtDesc(user.getId().toString())
                 .stream()
+                .filter(o -> !"waiting_payment".equals(o.getStatus()))
                 .map(this::toResponse)
                 .toList();
 
@@ -348,6 +391,7 @@ public class OrderService {
         List<Map<String, Object>> orders = orderRepository
                 .findAll()
                 .stream()
+                .filter(o -> !"waiting_payment".equals(o.getStatus()))
                 .map(this::toResponse)
                 .toList();
         return Map.of("orders", orders, "total", (long) orders.size());
@@ -661,10 +705,10 @@ public class OrderService {
         LocalDateTime yesterdayStart = todayStart.minusDays(1);
         LocalDateTime monthStart = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
 
-        double todayAmount = sumAmounts(orderRepository.findByCreatedAtBetween(todayStart, todayEnd));
-        double yesterdayAmount = sumAmounts(orderRepository.findByCreatedAtBetween(yesterdayStart, todayStart));
-        double monthlyAmount = sumAmounts(orderRepository.findByCreatedAtBetween(monthStart, todayEnd));
-        double totalAmount = sumAmounts(orderRepository.findAll());
+        double todayAmount = sumAmounts(orderRepository.findByCreatedAtBetween(todayStart, todayEnd).stream().filter(o -> !"waiting_payment".equals(o.getStatus())).toList());
+        double yesterdayAmount = sumAmounts(orderRepository.findByCreatedAtBetween(yesterdayStart, todayStart).stream().filter(o -> !"waiting_payment".equals(o.getStatus())).toList());
+        double monthlyAmount = sumAmounts(orderRepository.findByCreatedAtBetween(monthStart, todayEnd).stream().filter(o -> !"waiting_payment".equals(o.getStatus())).toList());
+        double totalAmount = sumAmounts(orderRepository.findAll().stream().filter(o -> !"waiting_payment".equals(o.getStatus())).toList());
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("todayOrderAmount", todayAmount);
@@ -681,7 +725,10 @@ public class OrderService {
     // ---------- Dashboard: son siparişler ----------
 
     public Map<String, Object> getDashboardRecentOrders() {
-        List<Order> all = orderRepository.findAllByOrderByCreatedAtDesc();
+        List<Order> all = orderRepository.findAllByOrderByCreatedAtDesc()
+                .stream()
+                .filter(o -> !"waiting_payment".equals(o.getStatus()))
+                .toList();
         List<Map<String, Object>> orders = all.stream()
                 .limit(10)
                 .map(o -> {
@@ -712,7 +759,10 @@ public class OrderService {
 
     public Map<String, Object> getSalesReport() {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now(java.time.ZoneId.of("Europe/Istanbul")).minusDays(30);
-        List<Order> orders = orderRepository.findByCreatedAtAfter(thirtyDaysAgo);
+        List<Order> orders = orderRepository.findByCreatedAtAfter(thirtyDaysAgo)
+                .stream()
+                .filter(o -> !"waiting_payment".equals(o.getStatus()))
+                .toList();
 
         Map<String, List<Order>> byDate = orders.stream()
                 .filter(o -> o.getCreatedAt() != null)
@@ -735,7 +785,10 @@ public class OrderService {
     // ---------- Dashboard: en çok satan kategori ----------
 
     public Map<String, Object> getMostSellingCategory() {
-        List<Order> orders = orderRepository.findAll();
+        List<Order> orders = orderRepository.findAll()
+                .stream()
+                .filter(o -> !"waiting_payment".equals(o.getStatus()))
+                .toList();
         Map<String, Integer> categoryCount = new LinkedHashMap<>();
 
         for (Order order : orders) {

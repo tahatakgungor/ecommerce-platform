@@ -15,5 +15,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findAllByOrderByCreatedAtDesc();
     List<Order> findByStatusIgnoreCase(String status);
     Optional<Order> findByIyzicoToken(String iyzicoToken);
+    Optional<Order> findByIyzicoConversationId(String iyzicoConversationId);
     Optional<Order> findByInvoiceAndEmail(String invoice, String email);
 }
