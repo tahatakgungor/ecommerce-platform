@@ -37,8 +37,12 @@ public class Coupon {
     @Column(nullable = false)
     private double minimumAmount;
 
-    @Column(nullable = false)
+    @Column
     private String productType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private ProductScope productScope = ProductScope.CATEGORY;
 
     private String status = "Active";
 

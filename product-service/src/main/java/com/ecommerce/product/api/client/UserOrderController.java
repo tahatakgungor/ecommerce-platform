@@ -1,6 +1,9 @@
 package com.ecommerce.product.api.client;
 
 import com.ecommerce.product.application.OrderService;
+import com.ecommerce.product.application.OrderReturnService;
+import com.ecommerce.product.dto.returns.CreateReturnRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -15,6 +18,7 @@ import java.util.UUID;
 public class UserOrderController {
 
     private final OrderService orderService;
+    private final OrderReturnService orderReturnService;
 
     // Giriş yapmış kullanıcının siparişleri
     @GetMapping("/order-by-user")
@@ -28,6 +32,23 @@ public class UserOrderController {
     public ResponseEntity<?> getSingleOrder(@PathVariable UUID id, Authentication auth) {
         String email = (auth != null) ? auth.getName() : null;
         Map<String, Object> result = orderService.getSingleOrderForUser(email, id);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/{orderId}/returns")
+    public ResponseEntity<?> createReturn(
+            @PathVariable UUID orderId,
+            @Valid @RequestBody CreateReturnRequest request,
+            Authentication auth) {
+        String email = (auth != null) ? auth.getName() : null;
+        Map<String, Object> result = orderReturnService.createReturn(email, orderId, request);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/returns")
+    public ResponseEntity<?> getMyReturns(Authentication auth) {
+        String email = (auth != null) ? auth.getName() : null;
+        Map<String, Object> result = orderReturnService.getMyReturns(email);
         return ResponseEntity.ok(result);
     }
 }

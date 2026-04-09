@@ -144,6 +144,7 @@ public class EmailService {
             log.info("[Email] Preparing order confirmation mail. invoice={}, recipient={}", order.getInvoice(), to);
             Context context = new Context();
             context.setVariable("order", order);
+            context.setVariable("trackingUrl", buildTrackingUrl(order));
             context.setVariable("orderViewUrl", buildOrderViewUrl(order));
             context.setVariable("registerUrl", buildRegisterUrl(order));
             

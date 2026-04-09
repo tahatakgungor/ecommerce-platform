@@ -119,6 +119,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/brand/all").permitAll()
                         .requestMatchers("/api/category/all").permitAll()
                         .requestMatchers("/api/coupon").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/site-settings").permitAll()
                         // İletişim formu - public
                         .requestMatchers("/api/contact/send").permitAll()
                         // Newsletter - giriş yapmadan abone olunabilir

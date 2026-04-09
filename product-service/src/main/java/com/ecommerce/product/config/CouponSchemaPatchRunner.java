@@ -37,11 +37,16 @@ public class CouponSchemaPatchRunner implements CommandLineRunner {
         executeSql("ALTER TABLE coupons ADD COLUMN IF NOT EXISTS scope VARCHAR(32)");
         executeSql("ALTER TABLE coupons ADD COLUMN IF NOT EXISTS assigned_user_email VARCHAR(255)");
         executeSql("ALTER TABLE coupons ADD COLUMN IF NOT EXISTS assigned_user_id VARCHAR(255)");
+        executeSql("ALTER TABLE coupons ADD COLUMN IF NOT EXISTS product_scope VARCHAR(32)");
         executeSql("UPDATE coupons SET scope = 'PUBLIC' WHERE scope IS NULL OR BTRIM(scope) = ''");
+        executeSql("UPDATE coupons SET product_scope = 'CATEGORY' WHERE product_scope IS NULL OR BTRIM(product_scope) = ''");
         executeSql("ALTER TABLE coupons ALTER COLUMN scope SET DEFAULT 'PUBLIC'");
         executeSql("ALTER TABLE coupons ALTER COLUMN scope SET NOT NULL");
+        executeSql("ALTER TABLE coupons ALTER COLUMN product_scope SET DEFAULT 'CATEGORY'");
+        executeSql("ALTER TABLE coupons ALTER COLUMN product_scope SET NOT NULL");
+        executeSql("ALTER TABLE coupons ALTER COLUMN product_type DROP NOT NULL");
 
-        log.info("Coupon schema patch tamamlandı (scope/assigned_user_email/assigned_user_id).");
+        log.info("Coupon schema patch tamamlandı (scope, product_scope, assignment alanları).");
     }
 
     private void executeSql(String sql) {

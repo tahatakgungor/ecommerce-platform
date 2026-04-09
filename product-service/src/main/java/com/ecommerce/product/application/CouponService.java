@@ -1,6 +1,7 @@
 package com.ecommerce.product.application;
 
 import com.ecommerce.product.domain.Coupon;
+import com.ecommerce.product.domain.ProductScope;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.repository.CouponRepository;
 import com.ecommerce.product.repository.UserRepository;
@@ -69,6 +70,7 @@ public class CouponService {
         if (details.getDiscountPercentage() > 0) coupon.setDiscountPercentage(details.getDiscountPercentage());
         if (details.getMinimumAmount() >= 0) coupon.setMinimumAmount(details.getMinimumAmount());
         if (details.getProductType() != null) coupon.setProductType(details.getProductType());
+        if (details.getProductScope() != null) coupon.setProductScope(details.getProductScope());
         if (details.getStatus() != null) coupon.setStatus(details.getStatus());
         if (details.getScope() != null) coupon.setScope(details.getScope());
         if (details.getAssignedUserEmail() != null || details.getAssignedUserId() != null) {
@@ -90,7 +92,13 @@ public class CouponService {
     private void applyCouponDefaults(Coupon coupon) {
         coupon.setTitle(requireText(coupon.getTitle(), "Kupon başlığı zorunludur."));
         coupon.setCouponCode(normalizeCouponCode(coupon.getCouponCode()));
-        coupon.setProductType(requireText(coupon.getProductType(), "Kupon ürün tipi zorunludur."));
+        ProductScope productScope = coupon.getProductScope() == null ? ProductScope.CATEGORY : coupon.getProductScope();
+        coupon.setProductScope(productScope);
+        if (productScope == ProductScope.CATEGORY) {
+            coupon.setProductType(requireText(coupon.getProductType(), "Kategori kapsamlı kupon için kategori zorunludur."));
+        } else {
+            coupon.setProductType(null);
+        }
         coupon.setEndTime(requireText(coupon.getEndTime(), "Kupon bitiş tarihi zorunludur."));
         coupon.setStartTime(normalizeNullable(coupon.getStartTime()));
 
