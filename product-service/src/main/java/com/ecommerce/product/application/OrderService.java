@@ -2,6 +2,7 @@ package com.ecommerce.product.application;
 
 import com.ecommerce.product.domain.Order;
 import com.ecommerce.product.domain.Product;
+import com.ecommerce.product.domain.ProductScope;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.domain.Coupon;
 import com.ecommerce.product.repository.CouponRepository;
@@ -655,6 +656,7 @@ public class OrderService {
         map.put("iyzicoToken", o.getIyzicoToken());
         map.put("iyzicoPaymentId", o.getIyzicoPaymentId());
         map.put("iyzicoConversationId", o.getIyzicoConversationId());
+        map.put("paymentMethod", extractPaymentMethod(o));
         
         // Kargo bilgileri
         map.put("shippingCarrier", o.getShippingCarrier());
@@ -709,7 +711,7 @@ public class OrderService {
         String couponCode = str(body, "couponCode");
 
         Coupon coupon = resolveCoupon(couponCode, userEmail);
-        if (coupon != null) {
+        if (coupon != null && coupon.getProductScope() == ProductScope.CATEGORY) {
             couponProductType = normalizeText(coupon.getProductType());
         }
 
@@ -734,7 +736,7 @@ public class OrderService {
             double lineTotal = price * quantity;
             subTotal += lineTotal;
 
-            if (coupon != null && matchesCouponProductType(couponProductType, product)) {
+            if (coupon != null && matchesCoupon(coupon, couponProductType, product)) {
                 couponEligibleTotal += lineTotal;
             }
 
@@ -848,7 +850,13 @@ public class OrderService {
         return quantity;
     }
 
-    private boolean matchesCouponProductType(String couponProductType, Product product) {
+    private boolean matchesCoupon(Coupon coupon, String couponProductType, Product product) {
+        if (coupon == null) {
+            return false;
+        }
+        if (coupon.getProductScope() == ProductScope.ALL_PRODUCTS) {
+            return true;
+        }
         if (couponProductType == null || couponProductType.isBlank()) {
             return false;
         }
@@ -856,6 +864,50 @@ public class OrderService {
         String parentCategory = normalizeText(product.getParentCategory());
         String categoryName = normalizeText(product.getCategoryName());
         return couponProductType.equals(parentCategory) || couponProductType.equals(categoryName);
+    }
+
+    private String extractPaymentMethod(Order order) {
+        if (order == null) {
+            return "";
+        }
+        String detail = order.getIyzicoPaymentDetail();
+        if (detail != null && !detail.isBlank()) {
+            try {
+                Map<String, Object> payment = objectMapper.readValue(detail, new TypeReference<Map<String, Object>>() {});
+                String cardFamily = asText(payment.get("cardFamily"));
+                String cardType = asText(payment.get("cardType"));
+                String cardAssociation = asText(payment.get("cardAssociation"));
+                String paymentSource = asText(payment.get("paymentSource"));
+                String basketId = asText(payment.get("basketId"));
+
+                String label = firstNonBlank(cardFamily, cardType, cardAssociation, paymentSource, basketId);
+                if (label != null) {
+                    return label;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        if (order.getIyzicoPaymentId() != null && !order.getIyzicoPaymentId().isBlank()) {
+            return "Kredi/Banka Kartı";
+        }
+        return "";
+    }
+
+    private String asText(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private String normalizeText(String value) {
@@ -964,7 +1016,7 @@ public class OrderService {
                     }
                     m.put("name", displayName != null ? displayName : "");
                     m.put("totalAmount", o.getTotalAmount() != null ? o.getTotalAmount() : 0.0);
-                    m.put("paymentMethod", "");
+                    m.put("paymentMethod", extractPaymentMethod(o));
                     m.put("status", o.getStatus() != null ? o.getStatus() : "pending");
                     m.put("createdAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
                     m.put("updatedAt", o.getCreatedAt() != null ? o.getCreatedAt().toString() : null);
