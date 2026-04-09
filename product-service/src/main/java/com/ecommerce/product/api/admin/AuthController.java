@@ -161,7 +161,7 @@ public class AuthController {
     @PreAuthorize("hasAuthority('Admin')")
     public ApiResponse<String> deleteStaff(@PathVariable("id") UUID id) {
         authService.deleteUser(id);
-        return ApiResponse.ok("Personel başarıyla silindi.", 1L);
+        return ApiResponse.ok("Kullanıcı ve ilişkili verileri başarıyla silindi.", 1L);
     }
 
     @PostMapping("/invite")

@@ -1,9 +1,15 @@
 package com.ecommerce.product.application;
 
+import com.ecommerce.product.domain.ProductReview;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.dto.auth.LoginRequest;
 import com.ecommerce.product.dto.auth.LoginResponse;
 import com.ecommerce.product.dto.auth.RegisterRequest;
+import com.ecommerce.product.repository.CouponRepository;
+import com.ecommerce.product.repository.NewsletterRepository;
+import com.ecommerce.product.repository.OrderRepository;
+import com.ecommerce.product.repository.ProductReviewFeedbackRepository;
+import com.ecommerce.product.repository.ProductReviewRepository;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +33,11 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final ProductReviewRepository productReviewRepository;
+    private final ProductReviewFeedbackRepository productReviewFeedbackRepository;
+    private final OrderRepository orderRepository;
+    private final NewsletterRepository newsletterRepository;
+    private final CouponRepository couponRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final EmailService emailService;
@@ -235,6 +246,39 @@ public class AuthService {
             throw new RuntimeException("Güvenlik ihlali: Kendi hesabınızı silemezsiniz!");
         }
 
+        UUID userId = userToDelete.getId();
+        String email = userToDelete.getEmail();
+
+        // 4. Kullanıcının verdiği oylar (başka kullanıcı yorumları dahil)
+        productReviewFeedbackRepository.deleteByUserId(userId);
+
+        // 5. Kullanıcının oluşturduğu yorumlar ve bu yorumlara bağlı oylar
+        List<ProductReview> userReviews = productReviewRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        for (ProductReview review : userReviews) {
+            if (review.getId() != null) {
+                productReviewFeedbackRepository.deleteByReviewId(review.getId());
+            }
+        }
+        if (!userReviews.isEmpty()) {
+            productReviewRepository.deleteAll(userReviews);
+        }
+
+        // 6. Kullanıcıyla ilişkili sipariş kayıtları (kayıtlı + aynı e-postalı misafir siparişleri)
+        if (userId != null) {
+            orderRepository.deleteByUserId(userId.toString());
+        }
+        if (email != null && !email.isBlank()) {
+            orderRepository.deleteByGuestEmailIgnoreCase(email);
+            newsletterRepository.deleteByEmailIgnoreCase(email);
+        }
+
+        // 7. Bu kullanıcıya atanmış kupon referanslarını temizle
+        String userIdValue = userId != null ? userId.toString() : null;
+        if ((email != null && !email.isBlank()) || (userIdValue != null && !userIdValue.isBlank())) {
+            couponRepository.clearAssignmentsForUser(email, userIdValue);
+        }
+
+        // 8. Son adım: kullanıcı kaydını sil
         userRepository.delete(userToDelete);
     }
 

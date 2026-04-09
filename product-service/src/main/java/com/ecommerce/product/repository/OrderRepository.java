@@ -21,4 +21,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findByInvoiceAndEmailIgnoreCase(String invoice, String email);
     Optional<Order> findByInvoiceAndGuestEmailIgnoreCase(String invoice, String guestEmail);
     List<Order> findByGuestEmailIgnoreCaseOrderByCreatedAtDesc(String guestEmail);
+    long deleteByUserId(String userId);
+    long deleteByGuestEmailIgnoreCase(String guestEmail);
 }

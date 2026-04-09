@@ -7,4 +7,5 @@ import java.util.Optional;
 
 public interface NewsletterRepository extends JpaRepository<NewsletterEmail, Long> {
     Optional<NewsletterEmail> findByEmail(String email);
+    void deleteByEmailIgnoreCase(String email);
 }

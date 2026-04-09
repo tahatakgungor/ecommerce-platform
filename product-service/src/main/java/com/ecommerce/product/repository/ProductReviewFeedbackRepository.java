@@ -9,4 +9,5 @@ import java.util.UUID;
 public interface ProductReviewFeedbackRepository extends JpaRepository<ProductReviewFeedback, UUID> {
     Optional<ProductReviewFeedback> findByReviewIdAndUserId(UUID reviewId, UUID userId);
     void deleteByReviewId(UUID reviewId);
+    void deleteByUserId(UUID userId);
 }
