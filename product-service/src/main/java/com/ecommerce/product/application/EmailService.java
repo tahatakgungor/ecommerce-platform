@@ -14,13 +14,16 @@ import org.thymeleaf.context.Context;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -47,6 +50,9 @@ public class EmailService {
 
     @Value("${app.mail.order-alert-recipients:}")
     private String orderAlertRecipients;
+
+    @Value("${app.frontend-url:http://localhost:3000}")
+    private String frontendUrl;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
@@ -131,13 +137,15 @@ public class EmailService {
     // --- Sipariş Bildirimleri ---
 
     public void sendOrderConfirmation(Order order) {
-        String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
+        String to = resolveRecipientEmail(order);
         if (to == null || to.isBlank()) return;
 
         try {
             log.info("[Email] Preparing order confirmation mail. invoice={}, recipient={}", order.getInvoice(), to);
             Context context = new Context();
             context.setVariable("order", order);
+            context.setVariable("orderViewUrl", buildOrderViewUrl(order));
+            context.setVariable("registerUrl", buildRegisterUrl(order));
             
             // Deserialize cart for template iteration
             List<Map<String, Object>> cartItems = deserializeCart(order.getCart());
@@ -152,7 +160,7 @@ public class EmailService {
     }
 
     public void sendShippingUpdate(Order order) {
-        String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
+        String to = resolveRecipientEmail(order);
         if (to == null || to.isBlank()) {
             log.warn("[Email] Shipping update mail skipped: recipient is empty. invoice={}", order.getInvoice());
             return;
@@ -177,7 +185,7 @@ public class EmailService {
     }
 
     public void sendDeliveryConfirmation(Order order) {
-        String to = order.getEmail() != null ? order.getEmail() : order.getGuestEmail();
+        String to = resolveRecipientEmail(order);
         if (to == null || to.isBlank()) return;
 
         try {
@@ -190,6 +198,61 @@ public class EmailService {
         } catch (Exception e) {
             log.error("Teslim bildirimi e-postası gönderilemedi: {}", e.getMessage());
         }
+    }
+
+    private String resolveRecipientEmail(Order order) {
+        if (order == null) return null;
+        if (order.getEmail() != null && !order.getEmail().isBlank()) {
+            return order.getEmail().trim();
+        }
+        if (order.getGuestEmail() != null && !order.getGuestEmail().isBlank()) {
+            return order.getGuestEmail().trim();
+        }
+        return null;
+    }
+
+    private String buildOrderViewUrl(Order order) {
+        if (order == null || order.getId() == null) {
+            return frontendUrl + "/order-lookup";
+        }
+        String base = frontendUrl + "/order/" + order.getId();
+        String invoice = order.getInvoice();
+        String email = resolveRecipientEmail(order);
+
+        if (invoice == null || invoice.isBlank() || email == null || email.isBlank()) {
+            return base;
+        }
+        return base
+                + "?invoice=" + URLEncoder.encode(invoice, StandardCharsets.UTF_8)
+                + "&email=" + URLEncoder.encode(email, StandardCharsets.UTF_8);
+    }
+
+    private String buildRegisterUrl(Order order) {
+        String email = resolveRecipientEmail(order);
+        if (email == null || email.isBlank()) {
+            return frontendUrl + "/register";
+        }
+        return frontendUrl + "/register?email=" + URLEncoder.encode(email, StandardCharsets.UTF_8);
+    }
+
+    private String buildTrackingUrl(Order order) {
+        String carrier = order != null && order.getShippingCarrier() != null
+                ? order.getShippingCarrier().trim().toLowerCase(Locale.ROOT)
+                : "";
+        String trackingNumber = order != null && order.getTrackingNumber() != null
+                ? order.getTrackingNumber().trim()
+                : "";
+        String encoded = URLEncoder.encode(trackingNumber, StandardCharsets.UTF_8);
+
+        if (carrier.contains("aras")) return "https://kargotakip.araskargo.com.tr/mainpage.aspx?code=" + encoded;
+        if (carrier.contains("yurt")) return "https://www.yurticikargo.com/tr/online-islemler/gonderi-sorgula?code=" + encoded;
+        if (carrier.contains("mng")) return "https://www.mngkargo.com.tr/gonderi-sorgula?code=" + encoded;
+        if (carrier.contains("ptt")) return "https://gonderitakip.ptt.gov.tr/Track/Verify?q=" + encoded;
+        if (carrier.contains("sürat") || carrier.contains("surat")) return "https://www.suratkargo.com.tr/KargoTakip/?code=" + encoded;
+        if (carrier.contains("ups")) return "https://www.ups.com/track?tracknum=" + encoded;
+        if (carrier.contains("dhl")) return "https://www.dhl.com/tr-tr/home/tracking/tracking-express.html?submit=1&tracking-id=" + encoded;
+
+        return "https://www.google.com/search?q=" + URLEncoder.encode(trackingNumber + " kargo takip", StandardCharsets.UTF_8);
     }
 
     public void sendNewOrderAlertToAdmins(Order order) {

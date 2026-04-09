@@ -19,4 +19,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     Optional<Order> findTopByIyzicoConversationIdOrderByCreatedAtDesc(String iyzicoConversationId);
     Optional<Order> findByInvoiceAndEmail(String invoice, String email);
     Optional<Order> findByInvoiceAndEmailIgnoreCase(String invoice, String email);
+    Optional<Order> findByInvoiceAndGuestEmailIgnoreCase(String invoice, String guestEmail);
+    List<Order> findByGuestEmailIgnoreCaseOrderByCreatedAtDesc(String guestEmail);
 }

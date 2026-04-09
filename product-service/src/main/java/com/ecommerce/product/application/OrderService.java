@@ -191,10 +191,19 @@ public class OrderService {
         order.setIyzicoConversationId(conversationId);
         order.setStatus("waiting_payment");
         
-        order.setName(str(body, "name"));
+        String bodyName = str(body, "name");
+        String bodyEmail = str(body, "email");
+        String bodyContact = str(body, "contact");
+        order.setName((bodyName != null && !bodyName.isBlank())
+                ? bodyName
+                : (user != null ? user.getName() : bodyName));
         order.setAddress(str(body, "address"));
-        order.setContact(str(body, "contact"));
-        order.setEmail(str(body, "email"));
+        order.setContact((bodyContact != null && !bodyContact.isBlank())
+                ? bodyContact
+                : (user != null ? user.getPhone() : bodyContact));
+        order.setEmail((bodyEmail != null && !bodyEmail.isBlank())
+                ? bodyEmail
+                : (user != null ? user.getEmail() : bodyEmail));
         order.setCity(city);
         order.setCountry(country);
         order.setZipCode(str(body, "zipCode"));
@@ -205,9 +214,9 @@ public class OrderService {
             order.setIsGuest(false);
         } else {
             order.setIsGuest(true);
-            order.setGuestEmail(str(body, "email"));
-            order.setGuestName(str(body, "name"));
-            order.setGuestPhone(str(body, "contact"));
+            order.setGuestEmail(bodyEmail);
+            order.setGuestName(bodyName);
+            order.setGuestPhone(bodyContact);
         }
         
         try {
@@ -475,10 +484,22 @@ public class OrderService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı!"));
 
-        List<Map<String, Object>> orders = orderRepository
+        List<Order> registeredOrders = orderRepository
                 .findByUserIdOrderByCreatedAtDesc(user.getId().toString())
-                .stream()
-                .filter(o -> !"waiting_payment".equals(o.getStatus()))
+                .stream().toList();
+        List<Order> guestOrders = orderRepository.findByGuestEmailIgnoreCaseOrderByCreatedAtDesc(user.getEmail());
+
+        Map<UUID, Order> merged = new LinkedHashMap<>();
+        for (Order order : registeredOrders) {
+            if (order.getId() != null) merged.put(order.getId(), order);
+        }
+        for (Order order : guestOrders) {
+            if (order.getId() != null) merged.putIfAbsent(order.getId(), order);
+        }
+
+        List<Map<String, Object>> orders = merged.values().stream()
+                .filter(o -> !"waiting_payment".equalsIgnoreCase(o.getStatus()))
+                .sorted(Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(this::toResponse)
                 .toList();
 
@@ -516,6 +537,7 @@ public class OrderService {
         String safeInvoice = invoice == null ? "" : invoice.trim();
         String safeEmail = email == null ? "" : email.trim();
         Order order = orderRepository.findByInvoiceAndEmailIgnoreCase(safeInvoice, safeEmail)
+                .or(() -> orderRepository.findByInvoiceAndGuestEmailIgnoreCase(safeInvoice, safeEmail))
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı veya e-posta eşleşmiyor."));
         return Map.of("order", toResponse(order));
     }

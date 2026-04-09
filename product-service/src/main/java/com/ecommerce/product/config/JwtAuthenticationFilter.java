@@ -29,47 +29,57 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // 1. Authorization header'dan token'ı dene
-        String token = null;
+        // 1. Authorization header ve cookie token'larını ayrı ayrı al.
+        String headerToken = null;
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
+            headerToken = authHeader.substring(7);
         }
 
-        // 2. Header yoksa httpOnly cookie'den dene
-        if (token == null && request.getCookies() != null) {
-            token = Arrays.stream(request.getCookies())
+        String cookieToken = null;
+        if (request.getCookies() != null) {
+            cookieToken = Arrays.stream(request.getCookies())
                     .filter(c -> "access_token".equals(c.getName()))
                     .map(Cookie::getValue)
                     .findFirst()
                     .orElse(null);
         }
 
+        String token = headerToken != null ? headerToken : cookieToken;
         if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        try {
-            String email = jwtService.extractEmail(token);
-            // KRİTİK: Rolü token'dan dinamik olarak çekiyoruz
-            String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
-
-            if (email != null && role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // Controller'da hasAuthority('Admin') dediğimiz için buraya direkt role ismini veriyoruz.
-                // Eğer hasRole('Admin') deseydik "ROLE_" + role yapmamız gerekirdi.
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        email,
-                        null,
-                        Collections.singletonList(new SimpleGrantedAuthority(role))
-                );
-
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
-        } catch (Exception e) {
-            log.debug("JWT doğrulama başarısız: {}", e.getMessage());
+        boolean authenticated = tryAuthenticate(token);
+        if (!authenticated && headerToken != null && cookieToken != null && !headerToken.equals(cookieToken)) {
+            // Header token süresi dolmuş/bozuk olabilir; cookie token ile tekrar dene.
+            tryAuthenticate(cookieToken);
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean tryAuthenticate(String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        try {
+            String email = jwtService.extractEmail(token);
+            String role = jwtService.extractClaim(token, claims -> claims.get("role", String.class));
+
+            if (email != null && role != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                    email,
+                    null,
+                    Collections.singletonList(new SimpleGrantedAuthority(role))
+                );
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+            return true;
+        } catch (Exception e) {
+            log.debug("JWT doğrulama başarısız: {}", e.getMessage());
+            return false;
+        }
     }
 }

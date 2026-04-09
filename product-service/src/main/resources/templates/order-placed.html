@@ -24,6 +24,7 @@
         .total { font-size: 18px; font-weight: 800; color: #0f766e; }
         .cta-wrap { text-align: center; margin-top: 22px; }
         .btn { display: inline-block; text-decoration: none; background: #0f766e; color: #fff; padding: 12px 22px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+        .btn-secondary { display: inline-block; text-decoration: none; background: #f1f5f9; color: #0f172a; padding: 11px 20px; border-radius: 8px; font-weight: 700; font-size: 13px; border: 1px solid #cbd5e1; margin-top: 10px; }
         .footer { background: #f8fafc; color: #6b7280; text-align: center; font-size: 12px; padding: 16px; }
     </style>
 </head>
@@ -73,7 +74,13 @@
             </div>
 
             <div class="cta-wrap">
-                <a href="https://serravit.com/user-dashboard" class="btn">Siparişlerimi Görüntüle</a>
+                <a th:href="${orderViewUrl}" class="btn">Siparişimi Görüntüle</a>
+                <div th:if="${order.isGuest}">
+                    <p style="margin: 12px 0 8px; font-size: 13px; color: #475569;">
+                        Aynı e-posta ile hesap oluşturup siparişlerinizi panelinizden takip edebilirsiniz.
+                    </p>
+                    <a th:href="${registerUrl}" class="btn-secondary">Hesap Oluştur</a>
+                </div>
             </div>
 
             <p style="margin-top:22px; font-size: 14px; color: #4b5563;">Sizi tekrar mağazamızda görmekten memnuniyet duyarız.</p>

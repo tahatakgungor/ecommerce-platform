@@ -38,18 +38,7 @@
         </div>
 
         <div class="cta">
-            <th:block th:with="carrier=${order.shippingCarrier != null ? order.shippingCarrier.toLowerCase() : ''},
-                                   no=${order.trackingNumber != null ? order.trackingNumber : ''},
-                                   trackUrl=${carrier.contains('aras') ? 'https://kargotakip.araskargo.com.tr/mainpage.aspx?code=' + no :
-                                             (carrier.contains('yurt') ? 'https://www.yurticikargo.com/tr/online-islemler/gonderi-sorgula?code=' + no :
-                                             (carrier.contains('mng') ? 'https://www.mngkargo.com.tr/gonderi-sorgula?code=' + no :
-                                             (carrier.contains('ptt') ? 'https://gonderitakip.ptt.gov.tr/Track/Verify?q=' + no :
-                                             (carrier.contains('s') and carrier.contains('rat') ? 'https://www.suratkargo.com.tr/KargoTakip/?code=' + no :
-                                             (carrier.contains('ups') ? 'https://www.ups.com/track?tracknum=' + no :
-                                             (carrier.contains('dhl') ? 'https://www.dhl.com/tr-tr/home/tracking/tracking-express.html?submit=1&tracking-id=' + no :
-                                             'https://www.google.com/search?q=' + no + '+kargo+takip')))))))}">
-                <a th:href="${trackUrl}" class="btn">Kargomu Takip Et</a>
-            </th:block>
+            <a th:href="${trackingUrl}" class="btn">Kargomu Takip Et</a>
         </div>
 
         <p style="font-size: 14px; color: #4b5563;">Teslim edildiğinde size tekrar bilgilendirme e-postası göndereceğiz.</p>
