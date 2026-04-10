@@ -6,12 +6,15 @@ import com.ecommerce.product.domain.OrderReturnStatus;
 import com.ecommerce.product.domain.User;
 import com.ecommerce.product.dto.returns.CreateReturnRequest;
 import com.ecommerce.product.dto.returns.UpdateReturnStatusRequest;
+import com.ecommerce.product.event.OrderReturnCreatedEvent;
+import com.ecommerce.product.event.OrderReturnStatusChangedEvent;
 import com.ecommerce.product.repository.OrderRepository;
 import com.ecommerce.product.repository.OrderReturnRepository;
 import com.ecommerce.product.repository.UserRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +33,7 @@ public class OrderReturnService {
     private final SiteSettingsService siteSettingsService;
     private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Map<String, Object> createReturn(String userEmail, UUID orderId, CreateReturnRequest request) {
@@ -64,6 +68,11 @@ public class OrderReturnService {
         orderReturn.setStatusHistory(toJson(List.of(buildHistoryEntry(OrderReturnStatus.REQUESTED, "Talep oluşturuldu.", user.getEmail()))));
 
         OrderReturn saved = orderReturnRepository.save(orderReturn);
+
+        // Denormalize returnStatus onto the Order for fast admin lookup
+        order.setReturnStatus(OrderReturnStatus.REQUESTED.name());
+        orderRepository.save(order);
+
         activityLogService.log(
                 "ORDER_RETURN_CREATED",
                 "INFO",
@@ -73,6 +82,12 @@ public class OrderReturnService {
                 saved.getId().toString(),
                 Map.of("orderId", orderId.toString(), "status", saved.getStatus().name())
         );
+
+        try {
+            eventPublisher.publishEvent(new OrderReturnCreatedEvent(saved, order));
+        } catch (Exception e) {
+            // Email hatası işlemi geri sarmamalı
+        }
 
         return Map.of("return", toResponse(saved));
     }
@@ -127,6 +142,17 @@ public class OrderReturnService {
                 saved.getId().toString(),
                 Map.of("status", nextStatus.name())
         );
+
+        // Sync returnStatus on the Order entity
+        orderRepository.findById(saved.getOrderId()).ifPresent(order -> {
+            order.setReturnStatus(nextStatus.name());
+            orderRepository.save(order);
+            try {
+                eventPublisher.publishEvent(new OrderReturnStatusChangedEvent(saved, order));
+            } catch (Exception e) {
+                // Email hatası işlemi geri sarmamalı
+            }
+        });
 
         return Map.of("return", toResponse(saved));
     }

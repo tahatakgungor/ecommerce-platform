@@ -1,6 +1,7 @@
 package com.ecommerce.product.application;
 
 import com.ecommerce.product.domain.Order;
+import com.ecommerce.product.domain.OrderReturn;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -53,6 +54,9 @@ public class EmailService {
 
     @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
+
+    @Value("${app.admin-frontend-url:http://localhost:3001}")
+    private String adminFrontendUrl;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
@@ -254,6 +258,94 @@ public class EmailService {
         if (carrier.contains("dhl")) return "https://www.dhl.com/tr-tr/home/tracking/tracking-express.html?submit=1&tracking-id=" + encoded;
 
         return "https://www.google.com/search?q=" + URLEncoder.encode(trackingNumber + " kargo takip", StandardCharsets.UTF_8);
+    }
+
+    // --- İade Bildirimleri ---
+
+    public void sendReturnRequestConfirmation(OrderReturn orderReturn, Order order) {
+        String to = orderReturn.getUserEmail();
+        if (to == null || to.isBlank()) return;
+        try {
+            log.info("[Email] Preparing return request confirmation. returnId={}, recipient={}", orderReturn.getId(), to);
+            Context context = new Context();
+            context.setVariable("orderReturn", toReturnMap(orderReturn));
+            context.setVariable("order", order);
+            context.setVariable("orderViewUrl", buildOrderViewUrl(order));
+            String html = templateEngine.process("return-request-customer", context);
+            sendEmail(to, "İade Talebiniz Alındı - SERRAVİT", null, html, null, "İade talebi onay e-postası");
+        } catch (Exception e) {
+            log.warn("[Email] İade talebi onay e-postası gönderilemedi (returnId={}): {}", orderReturn.getId(), e.getMessage());
+        }
+    }
+
+    public void sendReturnStatusUpdate(OrderReturn orderReturn, Order order) {
+        String to = orderReturn.getUserEmail();
+        if (to == null || to.isBlank()) return;
+        try {
+            log.info("[Email] Preparing return status update. returnId={}, status={}, recipient={}", orderReturn.getId(), orderReturn.getStatus(), to);
+            Context context = new Context();
+            context.setVariable("orderReturn", toReturnMap(orderReturn));
+            context.setVariable("order", order);
+            context.setVariable("newStatus", orderReturn.getStatus().name());
+            context.setVariable("orderViewUrl", buildOrderViewUrl(order));
+            String html = templateEngine.process("return-status-update", context);
+            String subject = buildReturnStatusSubject(orderReturn.getStatus().name());
+            sendEmail(to, subject, null, html, null, "İade durum güncelleme e-postası");
+        } catch (Exception e) {
+            log.warn("[Email] İade durum güncelleme e-postası gönderilemedi (returnId={}): {}", orderReturn.getId(), e.getMessage());
+        }
+    }
+
+    public void sendReturnAdminAlert(OrderReturn orderReturn, Order order) {
+        List<String> recipients = Arrays.stream((orderAlertRecipients == null ? "" : orderAlertRecipients).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .toList();
+
+        if (recipients.isEmpty()) {
+            String fallback = (replyToEmail != null && !replyToEmail.isBlank()) ? replyToEmail : fromEmail;
+            if (fallback == null || fallback.isBlank()) return;
+            recipients = List.of(fallback);
+        }
+
+        for (String to : recipients) {
+            try {
+                Context context = new Context();
+                context.setVariable("orderReturn", toReturnMap(orderReturn));
+                context.setVariable("order", order);
+                context.setVariable("adminReturnsUrl", adminFrontendUrl + "/returns");
+                String html = templateEngine.process("return-admin-alert", context);
+                sendEmail(to, "Yeni İade Talebi - " + (order.getInvoice() != null ? order.getInvoice() : "SERRAVIT"),
+                        null, html, null, "Yeni iade talebi admin bildirimi");
+            } catch (Exception e) {
+                log.warn("[Email] Yeni iade talebi admin bildirimi gönderilemedi ({}): {}", to, e.getMessage());
+            }
+        }
+    }
+
+    private Map<String, Object> toReturnMap(OrderReturn r) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("_id", r.getId() != null ? r.getId().toString() : "");
+        m.put("orderId", r.getOrderId() != null ? r.getOrderId().toString() : "");
+        m.put("userEmail", r.getUserEmail());
+        m.put("reason", r.getReason());
+        m.put("customerNote", r.getCustomerNote());
+        m.put("adminNote", r.getAdminNote());
+        m.put("status", r.getStatus() != null ? r.getStatus().name() : "");
+        m.put("createdAt", r.getCreatedAt() != null ? r.getCreatedAt().toString() : "");
+        m.put("updatedAt", r.getUpdatedAt() != null ? r.getUpdatedAt().toString() : "");
+        return m;
+    }
+
+    private String buildReturnStatusSubject(String status) {
+        return switch (status) {
+            case "APPROVED"  -> "İade Talebiniz Onaylandı - SERRAVİT";
+            case "REJECTED"  -> "İade Talebiniz Hakkında Bilgilendirme - SERRAVİT";
+            case "RECEIVED"  -> "İade Ürününüz Alındı - SERRAVİT";
+            case "REFUNDED"  -> "Para İadeniz Gerçekleştirildi - SERRAVİT";
+            default          -> "İade Durumunuz Güncellendi - SERRAVİT";
+        };
     }
 
     public void sendNewOrderAlertToAdmins(Order order) {

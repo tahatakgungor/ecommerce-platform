@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İade Talebiniz Alındı</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f4f6f8; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1f2937; }
+        .container { max-width: 620px; margin: 20px auto; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; background: #fff; }
+        .header { background: linear-gradient(135deg, #92400e, #b45309); color: #fff; padding: 30px 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; letter-spacing: .3px; }
+        .header p { margin: 8px 0 0; font-size: 14px; opacity: .92; }
+        .content { padding: 26px 22px; }
+        .badge { display: inline-block; background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+        .card p { margin: 6px 0; font-size: 14px; }
+        .line { border: none; border-top: 1px solid #edf2f7; margin: 20px 0; }
+        .status-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 14px 16px; margin-top: 14px; text-align: center; }
+        .status-box .status-label { font-size: 13px; color: #92400e; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+        .steps { margin-top: 18px; }
+        .step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
+        .step-num { background: #b45309; color: #fff; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+        .step-text { font-size: 13px; color: #374151; line-height: 1.5; }
+        .cta-wrap { text-align: center; margin-top: 22px; }
+        .btn { display: inline-block; text-decoration: none; background: #b45309; color: #fff; padding: 12px 22px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+        .footer { background: #f8fafc; color: #6b7280; text-align: center; font-size: 12px; padding: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SERRAVIT</h1>
+            <p>İade talebiniz başarıyla oluşturuldu.</p>
+        </div>
+
+        <div class="content">
+            <span class="badge">İade Talebi Alındı</span>
+            <p>Merhaba <strong th:text="${orderReturn.userEmail}">Müşteri</strong>,</p>
+            <p>İade talebiniz alındı. Ekibimiz en kısa sürede değerlendirip size bilgi verecektir.</p>
+
+            <div class="card">
+                <p><strong>İade Talep No:</strong> #<span th:text="${orderReturn._id}">RTN-123456</span></p>
+                <p><strong>Sipariş No:</strong> #<span th:text="${order.invoice}">INV-123456</span></p>
+                <p><strong>İade Nedeni:</strong> <span th:text="${orderReturn.reason}">Neden</span></p>
+                <p th:if="${orderReturn.customerNote != null}"><strong>Ek Notunuz:</strong> <span th:text="${orderReturn.customerNote}">Not</span></p>
+                <p><strong>Talep Tarihi:</strong> <span th:text="${orderReturn.createdAt}">Tarih</span></p>
+            </div>
+
+            <div class="status-box">
+                <div class="status-label">Mevcut Durum: Talep İnceleniyor</div>
+            </div>
+
+            <hr class="line" />
+
+            <h3 style="margin: 0 0 12px; font-size: 15px;">Süreç Nasıl İşler?</h3>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-num">1</div>
+                    <div class="step-text"><strong>Talep İnceleme:</strong> Ekibimiz talebinizi genellikle 1-2 iş günü içinde değerlendirir.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">2</div>
+                    <div class="step-text"><strong>Onay / Red Bildirimi:</strong> Talebiniz onaylanır veya reddedilirse e-posta ile bilgilendirilirsiniz.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">3</div>
+                    <div class="step-text"><strong>Ürün İadesi:</strong> Onay sonrasında ürünü belirtilen adrese kargolayabilirsiniz.</div>
+                </div>
+                <div class="step">
+                    <div class="step-num">4</div>
+                    <div class="step-text"><strong>Para İadesi:</strong> Ürün tarafımıza ulaştıktan sonra ödemeniz iade edilir.</div>
+                </div>
+            </div>
+
+            <div class="cta-wrap">
+                <a th:href="${orderViewUrl}" class="btn">Siparişimi Görüntüle</a>
+            </div>
+
+            <p style="margin-top:22px; font-size: 13px; color: #6b7280;">Herhangi bir sorunuz olursa destek ekibimizle iletişime geçebilirsiniz.</p>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 Serravit Doğal Sağlık Ürünleri. Bu e-posta otomatik olarak oluşturulmuştur.
+        </div>
+    </div>
+</body>
+</html>

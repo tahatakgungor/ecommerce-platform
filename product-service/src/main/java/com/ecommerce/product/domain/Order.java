@@ -44,6 +44,9 @@ public class Order {
     // INV-xxxxxx
     private String invoice;
 
+    // Denormalized return status for fast lookup (mirrors latest OrderReturn.status)
+    private String returnStatus;
+
     // sepet ürünleri JSON olarak saklanıyor
     @Column(columnDefinition = "TEXT")
     private String cart;

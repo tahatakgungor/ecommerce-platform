@@ -663,6 +663,14 @@ public class OrderService {
         map.put("trackingNumber", o.getTrackingNumber());
         map.put("shippedAt", o.getShippedAt() != null ? o.getShippedAt().toString() : null);
 
+        // İade bilgileri
+        String returnStatus = o.getReturnStatus();
+        map.put("returnStatus", returnStatus);
+        boolean hasOpenReturn = returnStatus != null
+                && !"REFUNDED".equals(returnStatus)
+                && !"REJECTED".equals(returnStatus);
+        map.put("hasOpenReturn", hasOpenReturn);
+
         return map;
     }
 

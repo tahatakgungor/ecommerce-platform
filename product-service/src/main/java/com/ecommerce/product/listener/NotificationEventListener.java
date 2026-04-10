@@ -3,6 +3,8 @@ package com.ecommerce.product.listener;
 import com.ecommerce.product.application.EmailService;
 import com.ecommerce.product.application.ActivityLogService;
 import com.ecommerce.product.event.OrderPlacedEvent;
+import com.ecommerce.product.event.OrderReturnCreatedEvent;
+import com.ecommerce.product.event.OrderReturnStatusChangedEvent;
 import com.ecommerce.product.event.OrderShippedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,5 +59,51 @@ public class NotificationEventListener {
         );
         log.info("[EmailEvent:{}] OrderShippedEvent completed for invoice={}", eventId, event.getOrder().getInvoice());
         // TODO: smsService.sendOrderShippedSms(event.getOrder());
+    }
+
+    @Async
+    @EventListener
+    public void handleOrderReturnCreatedEvent(OrderReturnCreatedEvent event) {
+        String eventId = UUID.randomUUID().toString();
+        log.info("[EmailEvent:{}] Handling OrderReturnCreatedEvent for returnId={}", eventId, event.getOrderReturn().getId());
+        try {
+            emailService.sendReturnRequestConfirmation(event.getOrderReturn(), event.getOrder());
+            emailService.sendReturnAdminAlert(event.getOrderReturn(), event.getOrder());
+            activityLogService.log(
+                    "RETURN_NOTIFICATION",
+                    "INFO",
+                    "İade talebi için müşteri ve admin bildirimleri gönderildi.",
+                    "system",
+                    "ORDER_RETURN",
+                    event.getOrderReturn().getId() != null ? event.getOrderReturn().getId().toString() : null,
+                    java.util.Map.of("orderId", event.getOrder().getId() != null ? event.getOrder().getId().toString() : "")
+            );
+        } catch (Exception e) {
+            log.warn("[EmailEvent:{}] OrderReturnCreatedEvent işlenirken hata: {}", eventId, e.getMessage());
+        }
+        log.info("[EmailEvent:{}] OrderReturnCreatedEvent completed for returnId={}", eventId, event.getOrderReturn().getId());
+    }
+
+    @Async
+    @EventListener
+    public void handleOrderReturnStatusChangedEvent(OrderReturnStatusChangedEvent event) {
+        String eventId = UUID.randomUUID().toString();
+        log.info("[EmailEvent:{}] Handling OrderReturnStatusChangedEvent for returnId={}, status={}", eventId,
+                event.getOrderReturn().getId(), event.getOrderReturn().getStatus());
+        try {
+            emailService.sendReturnStatusUpdate(event.getOrderReturn(), event.getOrder());
+            activityLogService.log(
+                    "RETURN_NOTIFICATION",
+                    "INFO",
+                    "İade durum güncellemesi müşteriye bildirildi.",
+                    "system",
+                    "ORDER_RETURN",
+                    event.getOrderReturn().getId() != null ? event.getOrderReturn().getId().toString() : null,
+                    java.util.Map.of("newStatus", event.getOrderReturn().getStatus().name())
+            );
+        } catch (Exception e) {
+            log.warn("[EmailEvent:{}] OrderReturnStatusChangedEvent işlenirken hata: {}", eventId, e.getMessage());
+        }
+        log.info("[EmailEvent:{}] OrderReturnStatusChangedEvent completed for returnId={}", eventId, event.getOrderReturn().getId());
     }
 }

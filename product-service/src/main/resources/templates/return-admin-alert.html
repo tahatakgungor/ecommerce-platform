@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yeni İade Talebi</title>
+    <style>
+        body { margin: 0; padding: 0; background: #f4f6f8; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1f2937; }
+        .container { max-width: 620px; margin: 20px auto; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; background: #fff; }
+        .header { background: linear-gradient(135deg, #1e3a5f, #1d4ed8); color: #fff; padding: 30px 24px; text-align: center; }
+        .header h1 { margin: 0; font-size: 24px; letter-spacing: .3px; }
+        .header p  { margin: 8px 0 0; font-size: 14px; opacity: .92; }
+        .content { padding: 26px 22px; }
+        .badge { display: inline-block; background: #eff6ff; border: 1px solid #93c5fd; color: #1e3a5f; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 700; margin-bottom: 14px; }
+        .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+        .card p { margin: 6px 0; font-size: 14px; }
+        .line { border: none; border-top: 1px solid #edf2f7; margin: 20px 0; }
+        .alert-box { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 10px; padding: 14px 16px; margin-top: 14px; }
+        .cta-wrap { text-align: center; margin-top: 22px; }
+        .btn { display: inline-block; text-decoration: none; background: #1d4ed8; color: #fff; padding: 12px 22px; border-radius: 8px; font-weight: 700; font-size: 14px; }
+        .footer { background: #f8fafc; color: #6b7280; text-align: center; font-size: 12px; padding: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SERRAVIT — Yönetim Paneli</h1>
+            <p>Yeni bir iade talebi oluşturuldu.</p>
+        </div>
+
+        <div class="content">
+            <span class="badge">Yeni İade Talebi</span>
+            <p>Bir müşteri iade talebi oluşturdu. Lütfen admin panelinden inceleyiniz.</p>
+
+            <div class="card">
+                <p><strong>İade Talep No:</strong> #<span th:text="${orderReturn._id}">RTN-123456</span></p>
+                <p><strong>Sipariş No:</strong> #<span th:text="${order.invoice}">INV-123456</span></p>
+                <p><strong>Müşteri E-posta:</strong> <span th:text="${orderReturn.userEmail}">musteri@mail.com</span></p>
+                <p><strong>İade Nedeni:</strong> <span th:text="${orderReturn.reason}">Neden</span></p>
+                <p th:if="${orderReturn.customerNote != null}"><strong>Müşteri Notu:</strong> <span th:text="${orderReturn.customerNote}">Not</span></p>
+                <p><strong>Talep Tarihi:</strong> <span th:text="${orderReturn.createdAt}">Tarih</span></p>
+            </div>
+
+            <div class="alert-box">
+                <p style="margin: 0; font-size: 13px; color: #1e3a5f;">
+                    <strong>Sipariş Tutarı:</strong> <span th:text="${order.totalAmount + ' TL'}">0 TL</span> &nbsp;|&nbsp;
+                    <strong>Durum:</strong> <span th:text="${order.status}">delivered</span>
+                </p>
+            </div>
+
+            <div class="cta-wrap">
+                <a th:href="${adminReturnsUrl}" class="btn">İade Taleplerini Yönet</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            &copy; 2026 Serravit — Bu e-posta yalnızca yetkili personele gönderilmiştir.
+        </div>
+    </div>
+</body>
+</html>
