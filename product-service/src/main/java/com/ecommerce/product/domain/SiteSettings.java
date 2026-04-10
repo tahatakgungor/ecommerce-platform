@@ -49,6 +49,12 @@ public class SiteSettings {
     @Column(nullable = false)
     private int returnWindowDays = 14;
 
+    @Column(nullable = false)
+    private int freeShippingThreshold = 400;
+
+    @Column(nullable = false)
+    private double defaultShippingFee = 49.9;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -67,6 +73,12 @@ public class SiteSettings {
         if (this.returnWindowDays <= 0) {
             this.returnWindowDays = 14;
         }
+        if (this.freeShippingThreshold <= 0) {
+            this.freeShippingThreshold = 400;
+        }
+        if (this.defaultShippingFee < 0) {
+            this.defaultShippingFee = 49.9;
+        }
     }
 
     @PreUpdate
@@ -77,6 +89,12 @@ public class SiteSettings {
         }
         if (this.returnWindowDays <= 0) {
             this.returnWindowDays = 14;
+        }
+        if (this.freeShippingThreshold <= 0) {
+            this.freeShippingThreshold = 400;
+        }
+        if (this.defaultShippingFee < 0) {
+            this.defaultShippingFee = 49.9;
         }
     }
 }

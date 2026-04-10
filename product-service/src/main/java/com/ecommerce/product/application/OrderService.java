@@ -50,6 +50,7 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final CouponRepository couponRepository;
     private final ActivityLogService activityLogService;
+    private final SiteSettingsService siteSettingsService;
     private final ObjectMapper objectMapper;
     private final Options iyzicoOptions;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
@@ -578,6 +579,15 @@ public class OrderService {
                 saved.getId() != null ? saved.getId().toString() : null,
                 Map.of("status", normalizedStatus)
         );
+
+        if ("delivered".equals(normalizedStatus)) {
+            try {
+                eventPublisher.publishEvent(new com.ecommerce.product.event.OrderDeliveredEvent(saved));
+            } catch (Exception e) {
+                log.warn("OrderDeliveredEvent yayınlanamadı: {}", e.getMessage());
+            }
+        }
+
         return Map.of("order", toResponse(saved));
     }
 
@@ -763,7 +773,7 @@ public class OrderService {
             sanitizedCart.add(sanitized);
         }
 
-        double shippingCost = Math.max(0.0, toDouble(body.get("shippingCost")));
+        double shippingCost = Math.max(0.0, siteSettingsService.calculateShippingCost(subTotal));
         double discountAmount = 0.0;
 
         if (coupon != null) {

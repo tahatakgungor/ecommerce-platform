@@ -111,17 +111,20 @@ public class EmailService {
         );
     }
 
-    public void sendContactEmail(String fromName, String fromEmail, String subject, String messageBody) {
-        sendEmail(
-                this.fromEmail,
-                "[İletişim Formu] " + subject,
-                "Gönderen: " + fromName + "\n" +
-                        "E-posta: " + fromEmail + "\n\n" +
-                        "Mesaj:\n" + messageBody,
-                null,
-                fromEmail,
-                "İletişim formu e-postası"
-        );
+    public void sendContactEmail(String fromName, String fromEmail, String subject, String messageBody, String supportEmail) {
+        List<String> recipients = parseAlertRecipients(supportEmail);
+        for (String to : recipients) {
+            sendEmail(
+                    to,
+                    "[İletişim Formu] " + subject,
+                    "Gönderen: " + fromName + "\n" +
+                            "E-posta: " + fromEmail + "\n\n" +
+                            "Mesaj:\n" + messageBody,
+                    null,
+                    fromEmail,
+                    "İletişim formu e-postası"
+            );
+        }
     }
 
     public void sendInviteEmail(String toEmail, String inviteLink) {
@@ -199,6 +202,8 @@ public class EmailService {
             log.info("[Email] Preparing delivery confirmation mail. invoice={}, recipient={}", order.getInvoice(), to);
             Context context = new Context();
             context.setVariable("order", order);
+            context.setVariable("orderViewUrl", buildOrderViewUrl(order));
+            context.setVariable("storeFeedbackUrl", frontendUrl + "/contact");
 
             String htmlContent = templateEngine.process("order-delivered", context);
             sendEmail(to, "Siparişiniz Teslim Edildi - SERRAVİT", null, htmlContent, null, "Teslim bildirimi e-postası");
@@ -299,17 +304,7 @@ public class EmailService {
     }
 
     public void sendReturnAdminAlert(OrderReturn orderReturn, Order order) {
-        List<String> recipients = Arrays.stream((orderAlertRecipients == null ? "" : orderAlertRecipients).split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .distinct()
-                .toList();
-
-        if (recipients.isEmpty()) {
-            String fallback = (replyToEmail != null && !replyToEmail.isBlank()) ? replyToEmail : fromEmail;
-            if (fallback == null || fallback.isBlank()) return;
-            recipients = List.of(fallback);
-        }
+        List<String> recipients = parseAlertRecipients(null);
 
         for (String to : recipients) {
             try {
@@ -362,17 +357,7 @@ public class EmailService {
     }
 
     public void sendNewOrderAlertToAdmins(Order order) {
-        List<String> recipients = Arrays.stream((orderAlertRecipients == null ? "" : orderAlertRecipients).split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .distinct()
-                .toList();
-
-        if (recipients.isEmpty()) {
-            String fallback = (replyToEmail != null && !replyToEmail.isBlank()) ? replyToEmail : fromEmail;
-            if (fallback == null || fallback.isBlank()) return;
-            recipients = List.of(fallback);
-        }
+        List<String> recipients = parseAlertRecipients(null);
 
         for (String to : recipients) {
             try {
@@ -401,6 +386,23 @@ public class EmailService {
             log.warn("Cart JSON deserialization failed for email: {}", e.getMessage());
             return List.of();
         }
+    }
+
+    private List<String> parseAlertRecipients(String preferredSupportEmail) {
+        java.util.LinkedHashSet<String> recipients = new java.util.LinkedHashSet<>();
+        if (preferredSupportEmail != null && !preferredSupportEmail.isBlank()) {
+            recipients.add(preferredSupportEmail.trim());
+        }
+        Arrays.stream((orderAlertRecipients == null ? "" : orderAlertRecipients).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .forEach(recipients::add);
+
+        String fallback = (replyToEmail != null && !replyToEmail.isBlank()) ? replyToEmail : fromEmail;
+        if ((recipients.isEmpty()) && fallback != null && !fallback.isBlank()) {
+            recipients.add(fallback.trim());
+        }
+        return recipients.stream().toList();
     }
 
     private void sendEmail(String toEmail, String subject, String text, String html, String explicitReplyTo, String emailType) {

@@ -31,6 +31,8 @@ public class SiteSettingsService {
         result.put("supportEmail", settings.getSupportEmail());
         result.put("supportPhone", settings.getSupportPhone());
         result.put("returnWindowDays", settings.getReturnWindowDays());
+        result.put("freeShippingThreshold", settings.getFreeShippingThreshold());
+        result.put("defaultShippingFee", settings.getDefaultShippingFee());
         return result;
     }
 
@@ -75,6 +77,12 @@ public class SiteSettingsService {
         if (body.containsKey("returnWindowDays")) {
             settings.setReturnWindowDays(parsePositiveInt(body.get("returnWindowDays"), 14));
         }
+        if (body.containsKey("freeShippingThreshold")) {
+            settings.setFreeShippingThreshold(parsePositiveInt(body.get("freeShippingThreshold"), 400));
+        }
+        if (body.containsKey("defaultShippingFee")) {
+            settings.setDefaultShippingFee(parsePositiveDouble(body.get("defaultShippingFee"), 49.9));
+        }
 
         return siteSettingsRepository.save(settings);
     }
@@ -82,6 +90,19 @@ public class SiteSettingsService {
     @Transactional(readOnly = true)
     public int getReturnWindowDays() {
         return getOrCreate().getReturnWindowDays();
+    }
+
+    @Transactional(readOnly = true)
+    public String getSupportEmail() {
+        return getOrCreate().getSupportEmail();
+    }
+
+    @Transactional(readOnly = true)
+    public double calculateShippingCost(double subTotal) {
+        SiteSettings settings = getOrCreate();
+        int threshold = settings.getFreeShippingThreshold() > 0 ? settings.getFreeShippingThreshold() : 400;
+        double fee = settings.getDefaultShippingFee() >= 0 ? settings.getDefaultShippingFee() : 49.9;
+        return subTotal >= threshold ? 0.0 : fee;
     }
 
     private SiteSettings getOrCreate() {
@@ -108,6 +129,18 @@ public class SiteSettingsService {
         try {
             int parsed = Integer.parseInt(String.valueOf(value));
             return parsed > 0 ? parsed : fallback;
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    private double parsePositiveDouble(Object value, double fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            double parsed = Double.parseDouble(String.valueOf(value));
+            return parsed >= 0 ? parsed : fallback;
         } catch (Exception e) {
             return fallback;
         }
