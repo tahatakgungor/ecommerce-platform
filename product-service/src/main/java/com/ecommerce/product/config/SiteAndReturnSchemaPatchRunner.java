@@ -31,10 +31,13 @@ public class SiteAndReturnSchemaPatchRunner implements CommandLineRunner {
                     support_email VARCHAR(320),
                     support_phone VARCHAR(40),
                     return_window_days INTEGER NOT NULL DEFAULT 14,
+                    free_shipping_threshold INTEGER NOT NULL DEFAULT 400,
+                    default_shipping_fee DOUBLE PRECISION NOT NULL DEFAULT 49.9,
                     created_at TIMESTAMP,
                     updated_at TIMESTAMP
                 )
                 """);
+        patchSiteSettingsColumns();
 
         executeSql("""
                 CREATE TABLE IF NOT EXISTS order_returns (
@@ -57,6 +60,24 @@ public class SiteAndReturnSchemaPatchRunner implements CommandLineRunner {
         executeSql("CREATE INDEX IF NOT EXISTS idx_order_returns_user_email ON order_returns(user_email)");
 
         log.info("SiteSettings ve OrderReturn schema patch tamamlandı.");
+    }
+
+    private void patchSiteSettingsColumns() {
+        // Existing production tables may miss newer columns. Patch idempotently.
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS announcement_text_tr VARCHAR(255)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS announcement_text_en VARCHAR(255)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS announcement_link VARCHAR(500)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS announcement_active BOOLEAN NOT NULL DEFAULT FALSE");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS announcement_speed INTEGER NOT NULL DEFAULT 40");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS whatsapp_number VARCHAR(40)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS whatsapp_label VARCHAR(120)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS support_email VARCHAR(320)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS support_phone VARCHAR(40)");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS return_window_days INTEGER NOT NULL DEFAULT 14");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS free_shipping_threshold INTEGER NOT NULL DEFAULT 400");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS default_shipping_fee DOUBLE PRECISION NOT NULL DEFAULT 49.9");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS created_at TIMESTAMP");
+        executeSql("ALTER TABLE site_settings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP");
     }
 
     private void executeSql(String sql) {
