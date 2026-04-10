@@ -20,6 +20,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -333,9 +335,20 @@ public class EmailService {
         m.put("customerNote", r.getCustomerNote());
         m.put("adminNote", r.getAdminNote());
         m.put("status", r.getStatus() != null ? r.getStatus().name() : "");
-        m.put("createdAt", r.getCreatedAt() != null ? r.getCreatedAt().toString() : "");
-        m.put("updatedAt", r.getUpdatedAt() != null ? r.getUpdatedAt().toString() : "");
+        m.put("createdAt", formatDateTime(r.getCreatedAt()));
+        m.put("updatedAt", formatDateTime(r.getUpdatedAt()));
         return m;
+    }
+
+    private static final DateTimeFormatter TR_DATE_FORMAT = DateTimeFormatter.ofPattern("d MMMM yyyy HH:mm", new java.util.Locale("tr", "TR"));
+
+    private String formatDateTime(LocalDateTime dt) {
+        if (dt == null) return "";
+        try {
+            return dt.format(TR_DATE_FORMAT);
+        } catch (Exception e) {
+            return dt.toString();
+        }
     }
 
     private String buildReturnStatusSubject(String status) {
