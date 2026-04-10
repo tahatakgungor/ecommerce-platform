@@ -30,8 +30,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
@@ -41,6 +43,7 @@ class OrderServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private CouponRepository couponRepository;
     @Mock private ActivityLogService activityLogService;
+    @Mock private SiteSettingsService siteSettingsService;
     @Mock private Options iyzicoOptions;
     @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -54,10 +57,12 @@ class OrderServiceTest {
                 productRepository,
                 couponRepository,
                 activityLogService,
+                siteSettingsService,
                 new ObjectMapper(),
                 iyzicoOptions,
                 eventPublisher
         );
+        lenient().when(siteSettingsService.calculateShippingCost(anyDouble())).thenReturn(30.0);
         ReflectionTestUtils.setField(orderService, "paymentConfirmFallbackMode", "LOG_ONLY");
         ReflectionTestUtils.setField(orderService, "allowBodyFallback", true);
     }
