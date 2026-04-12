@@ -1,0 +1,34 @@
+# Kopyalayıp backup.conf olarak kaydedin:
+# cp ops/backup/backup.conf.example ops/backup/backup.conf
+
+# Yedeklerin sunucuda tutulacağı kök dizin
+BACKUP_ROOT="/var/backups/ecommerce-platform"
+
+# Local retention (gün)
+RETENTION_DAYS_LOCAL=30
+
+# PostgreSQL ayarları
+PG_CONTAINER="ecommerce-db"
+PG_USER="postgres"
+PG_DB="ecommerce"
+
+# Restore sırasında DB şemasını sıfırlamak isterseniz 1 yapın
+RECREATE_DB_ON_RESTORE=0
+
+# Volume yedeği
+# Birden fazla volume için boşlukla ayırın: "postgres_data uploads_data"
+DOCKER_VOLUMES="postgres_data"
+
+# Sunucuda ayrıca yedeklenecek klasörler (opsiyonel)
+# Örn: "/data/coolify/source /var/lib/coolify"
+EXTRA_PATHS=""
+
+# Offsite yedek (rclone) - 1: açık, 0: kapalı
+ENABLE_RCLONE=0
+
+# Örn: "wasabi-serravit:backup/ecommerce-platform"
+RCLONE_REMOTE=""
+
+# Doğrulama scriptinde geçici Postgres ayağa kaldırma (1/0)
+VERIFY_WITH_TEMP_DB=1
+VERIFY_TEMP_DB_IMAGE="postgres:15-alpine"
