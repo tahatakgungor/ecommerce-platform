@@ -181,6 +181,7 @@ public class EmailService {
                     order.getInvoice(), to, order.getShippingCarrier(), order.getTrackingNumber());
             Context context = new Context();
             context.setVariable("order", order);
+            context.setVariable("trackingUrl", buildTrackingUrl(order));
             
             // Deserialize cart for template iteration
             List<Map<String, Object>> cartItems = deserializeCart(order.getCart());
@@ -203,7 +204,6 @@ public class EmailService {
             Context context = new Context();
             context.setVariable("order", order);
             context.setVariable("orderViewUrl", buildOrderViewUrl(order));
-            context.setVariable("storeFeedbackUrl", frontendUrl + "/contact");
 
             String htmlContent = templateEngine.process("order-delivered", context);
             sendEmail(to, "Siparişiniz Teslim Edildi - SERRAVİT", null, htmlContent, null, "Teslim bildirimi e-postası");

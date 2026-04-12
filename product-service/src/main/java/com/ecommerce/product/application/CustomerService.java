@@ -6,6 +6,7 @@ import com.ecommerce.product.dto.auth.CustomerLoginResponse;
 import com.ecommerce.product.dto.auth.CustomerSignupRequest;
 import com.ecommerce.product.dto.auth.CustomerUserDto;
 import com.ecommerce.product.repository.NewsletterRepository;
+import com.ecommerce.product.repository.OrderRepository;
 import com.ecommerce.product.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class CustomerService {
 
     private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
     private final NewsletterRepository newsletterRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -53,6 +55,8 @@ public class CustomerService {
         User user = userRepository.findByEmail(normalizedEmail)
                 .map(existingUser -> refreshPendingCustomerSignup(existingUser, request, verificationToken))
                 .orElseGet(() -> createNewCustomerSignup(request, normalizedEmail, verificationToken));
+
+        claimGuestOrdersForUser(user);
 
         String verificationLink = frontendUrl + "/email-verify/" + verificationToken;
         emailService.sendVerificationEmail(user.getEmail(), verificationLink);
@@ -125,6 +129,7 @@ public class CustomerService {
         user.setEmailVerified(true);
         user.setEmailVerificationToken(null);
         userRepository.save(user);
+        claimGuestOrdersForUser(user);
 
         String jwtToken = jwtService.generateToken(user.getEmail(), user.getRole());
         return new CustomerLoginResponse(jwtToken, toDto(user));
@@ -307,9 +312,30 @@ public class CustomerService {
         }
 
         userRepository.save(user);
+        claimGuestOrdersForUser(user);
 
         String token = jwtService.generateToken(user.getEmail(), user.getRole());
         return new CustomerLoginResponse(token, toDto(user));
+    }
+
+    private void claimGuestOrdersForUser(User user) {
+        if (user == null || user.getId() == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+        var guestOrders = orderRepository.findByGuestEmailIgnoreCaseOrderByCreatedAtDesc(user.getEmail());
+        if (guestOrders == null || guestOrders.isEmpty()) {
+            return;
+        }
+
+        for (var order : guestOrders) {
+            if (order == null) continue;
+            order.setUserId(user.getId().toString());
+            order.setIsGuest(false);
+            if (order.getEmail() == null || order.getEmail().isBlank()) {
+                order.setEmail(user.getEmail());
+            }
+        }
+        orderRepository.saveAll(guestOrders);
     }
 
     @Transactional

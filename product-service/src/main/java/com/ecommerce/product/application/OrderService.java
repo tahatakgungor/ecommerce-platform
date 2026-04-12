@@ -265,7 +265,7 @@ public class OrderService {
                 Map<String, Object> resp = new LinkedHashMap<>();
                 resp.put("success", true);
                 resp.put("orderId", ex.getId().toString());
-                resp.put("order", toResponse(ex));
+                resp.put("order", toResponse(ex, new HashMap<>()));
                 activityLogService.log(
                         "PAYMENT_REPLAY",
                         "INFO",
@@ -291,7 +291,7 @@ public class OrderService {
                 Map<String, Object> resp = new LinkedHashMap<>();
                 resp.put("success", true);
                 resp.put("orderId", ex.getId().toString());
-                resp.put("order", toResponse(ex));
+                resp.put("order", toResponse(ex, new HashMap<>()));
                 log.info("[PaymentSecurity] Replay detected by token. Returning existing order. token={}, orderId={}",
                         token, ex.getId());
                 activityLogService.log(
@@ -436,7 +436,7 @@ public class OrderService {
                 Map<String, Object> resp = new LinkedHashMap<>();
                 resp.put("success", true);
                 resp.put("orderId", ex.getId().toString());
-                resp.put("order", toResponse(ex));
+                resp.put("order", toResponse(ex, new HashMap<>()));
                 return resp;
             }
             throw new RuntimeException("Sipariş kaydedilemedi. Lütfen tekrar deneyin.");
@@ -445,7 +445,7 @@ public class OrderService {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("success", true);
         response.put("orderId", saved.getId().toString());
-        response.put("order", toResponse(saved));
+        response.put("order", toResponse(saved, new HashMap<>()));
 
         // Sipariş başarılı olduğunda asenkron bildirim gönder
         try {
@@ -499,10 +499,11 @@ public class OrderService {
             if (order.getId() != null) merged.putIfAbsent(order.getId(), order);
         }
 
+        Map<String, Boolean> registeredEmailCache = new HashMap<>();
         List<Map<String, Object>> orders = merged.values().stream()
                 .filter(o -> !"waiting_payment".equalsIgnoreCase(o.getStatus()))
                 .sorted(Comparator.comparing(Order::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-                .map(this::toResponse)
+                .map(o -> toResponse(o, registeredEmailCache))
                 .toList();
 
         return Map.of("orders", orders);
@@ -513,7 +514,7 @@ public class OrderService {
     public Map<String, Object> getSingleOrder(UUID id) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı!"));
-        return Map.of("order", toResponse(order));
+        return Map.of("order", toResponse(order, new HashMap<>()));
     }
 
     public Map<String, Object> getSingleOrderForUser(String email, UUID id) {
@@ -532,7 +533,7 @@ public class OrderService {
         } 
         // If guest, we allow viewing by UUID (Security by Obscurity via non-enumerable IDs)
         
-        return Map.of("order", toResponse(order));
+        return Map.of("order", toResponse(order, new HashMap<>()));
     }
 
     public Map<String, Object> getOrderByInvoiceAndEmail(String invoice, String email) {
@@ -541,17 +542,18 @@ public class OrderService {
         Order order = orderRepository.findByInvoiceAndEmailIgnoreCase(safeInvoice, safeEmail)
                 .or(() -> orderRepository.findByInvoiceAndGuestEmailIgnoreCase(safeInvoice, safeEmail))
                 .orElseThrow(() -> new RuntimeException("Sipariş bulunamadı veya e-posta eşleşmiyor."));
-        return Map.of("order", toResponse(order));
+        return Map.of("order", toResponse(order, new HashMap<>()));
     }
 
     // ---------- Admin: tüm siparişler ----------
 
     public Map<String, Object> getAllOrders() {
+        Map<String, Boolean> registeredEmailCache = new HashMap<>();
         List<Map<String, Object>> orders = orderRepository
                 .findAll()
                 .stream()
                 .filter(o -> !"waiting_payment".equals(o.getStatus()))
-                .map(this::toResponse)
+                .map(o -> toResponse(o, registeredEmailCache))
                 .toList();
         return Map.of("orders", orders, "total", (long) orders.size());
     }
@@ -588,7 +590,7 @@ public class OrderService {
             }
         }
 
-        return Map.of("order", toResponse(saved));
+        return Map.of("order", toResponse(saved, new HashMap<>()));
     }
 
     // ---------- Kargo Yönetimi ----------
@@ -633,12 +635,12 @@ public class OrderService {
                 )
         );
 
-        return Map.of("order", toResponse(saved));
+        return Map.of("order", toResponse(saved, new HashMap<>()));
     }
 
     // ---------- Yardımcı metotlar ----------
 
-    private Map<String, Object> toResponse(Order o) {
+    private Map<String, Object> toResponse(Order o, Map<String, Boolean> registeredEmailCache) {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("_id", o.getId().toString());
         map.put("name", o.getName());
@@ -651,7 +653,7 @@ public class OrderService {
         map.put("shippingOption", o.getShippingOption());
         map.put("status", o.getStatus());
         map.put("userId", o.getUserId());
-        map.put("isGuest", o.getIsGuest() != null && o.getIsGuest());
+        map.put("isGuest", isEffectiveGuestOrder(o, registeredEmailCache));
         map.put("guestEmail", o.getGuestEmail());
         map.put("invoice", o.getInvoice());
         map.put("subTotal", o.getSubTotal());
@@ -682,6 +684,28 @@ public class OrderService {
         map.put("hasOpenReturn", hasOpenReturn);
 
         return map;
+    }
+
+    private boolean isEffectiveGuestOrder(Order order, Map<String, Boolean> registeredEmailCache) {
+        if (order == null) {
+            return false;
+        }
+        if (order.getUserId() != null && !order.getUserId().isBlank()) {
+            return false;
+        }
+
+        String guestEmail = order.getGuestEmail() != null ? order.getGuestEmail().trim().toLowerCase(Locale.ROOT) : "";
+        if (!guestEmail.isBlank()) {
+            Boolean exists = registeredEmailCache.computeIfAbsent(
+                    guestEmail,
+                    key -> userRepository.existsByEmailIgnoreCase(key)
+            );
+            if (Boolean.TRUE.equals(exists)) {
+                return false;
+            }
+        }
+
+        return order.getIsGuest() != null && order.getIsGuest();
     }
 
     private String toJson(Object obj) {
