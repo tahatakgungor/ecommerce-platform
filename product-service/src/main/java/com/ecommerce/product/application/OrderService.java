@@ -210,6 +210,7 @@ public class OrderService {
         order.setCountry(country);
         order.setZipCode(str(body, "zipCode"));
         order.setShippingOption(str(body, "shippingOption"));
+        order.setOrderNote(str(body, "orderNote"));
         
         if (user != null) {
             order.setUserId(user.getId().toString());
@@ -361,6 +362,7 @@ public class OrderService {
             order.setCountry(str(body, "country"));
             order.setZipCode(str(body, "zipCode"));
             order.setShippingOption(str(body, "shippingOption"));
+            order.setOrderNote(str(body, "orderNote"));
             
             User user = null;
             if (email != null && !email.isBlank() && !"anonymousUser".equals(email)) {
@@ -651,6 +653,7 @@ public class OrderService {
         map.put("country", o.getCountry());
         map.put("zipCode", o.getZipCode());
         map.put("shippingOption", o.getShippingOption());
+        map.put("orderNote", o.getOrderNote());
         map.put("status", o.getStatus());
         map.put("userId", o.getUserId());
         map.put("isGuest", isEffectiveGuestOrder(o, registeredEmailCache));

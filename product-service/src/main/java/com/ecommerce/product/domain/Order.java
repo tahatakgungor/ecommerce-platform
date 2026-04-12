@@ -23,6 +23,9 @@ public class Order {
     private String country;
     private String zipCode;
     private String shippingOption;
+    
+    @Column(columnDefinition = "TEXT")
+    private String orderNote;
 
     // pending | processing | shipped | delivered | cancelled
     private String status;
